@@ -4,6 +4,67 @@
 
 ---
 
+## 📌 BURADAN DEVAM ET (26 Temmuz 2026'da duraklatıldı)
+
+**Durum:** Faz 1'in 4/7 adımı bitti. Her şey commit'li (`1d2d861`), çalışan ağaç temiz.
+
+```
+[x] 1  iskelet + kaynak/konum + tanılama motoru
+[x] 2  lexer                    15/15 örnek, 6.889 token
+[x] 3  AST                      20 ifade + 16 deyim düğümü
+[x] 4  parser                   15/15 örnek ayrışıyor
+[ ] 5  resolver          ← SIRADAKİ İŞ
+[ ] 6  yorumlayıcı
+[ ] 7  REPL
+```
+
+**Derleme:** `powershell -File build.ps1` (w64devkit'i kendi bulur)
+**Sınama:** `build\rs.exe ast examples\12-algoritmalar.rai`
+
+### Adım 5 — Resolver: ne yapacak
+
+Yeni dosya `src/resolver.hpp/.cpp`. `ExprVisitor` + `StmtVisitor` uygulayacak
+(AstDumper'ın yaptığı gibi — ağaç hiç değişmeyecek).
+
+1. **Kapsam zinciri.** Blok/fonksiyon/sınıf başına bir kapsam. Bir kapsamdaki
+   İLK atama tanımlamadır (SPEC §2); sonrakiler yeniden atamadır.
+2. **`outer` semantiği.** `outer x = ...` dış kapsamdaki `x`'i hedefler; dışarıda
+   yoksa hata.
+3. **Kapanış upvalue'ları.** Lambda'nın kapattığı değişkenleri işaretle —
+   yorumlayıcı bunları heap'te yaşatacak.
+4. **Tanımsız isim hatası.** Kullanılan ama hiç tanımlanmamış her ad burada
+   yakalanır; tanılama motoru zaten hazır (satır/sütun + ok işareti + ipucu).
+5. **Bildirilmemiş sınıf alanı UYARISI** (SPEC §4, bulgu #3): `init` içinde
+   `self.x = ...` ile yaratılan ve sınıf gövdesinde bildirilmeyen alanlar
+   `any` tipini alır ve uyarı üretir.
+6. **`self` / `super` bağlamı.** Metot dışında kullanılırsa hata.
+
+### Adım 6 — Yorumlayıcı: ne yapacak
+
+Yeni dosya `src/value.hpp` (değer temsili) + `src/interp.hpp/.cpp`.
+
+- Değer: `int64`, `double`, `bool`, `nil`, `string`, `list`, `map`, fonksiyon,
+  sınıf, örnek. Faz 1'de `shared_ptr` yeterli — GC Faz 3'te gelecek.
+- **Doğruluk kuralı: SADECE `nil` ve `false` yanlıştır** (SPEC §2). `0` ve `""` doğru.
+- **`/` her zaman float, `//` tam bölme** (SPEC §2).
+- `and`/`or` kısa devre (bu yüzden AST'de `Logical` ayrı düğüm).
+- `return`/`break`/`continue` C++ istisnasıyla taşınır (tree-walk'ta en temiz yol).
+- `throw`/`try`/`catch`/`finally` → RaidenScript istisnaları.
+- Prelude (SPEC §7.2): `print len type int float str bool range assert Error`.
+
+**Bitiş çizgisi:** `rs run examples/01-temeller.rai` çalışsın.
+
+### Aklında tut
+
+- 15 örnek artık **regresyon takımı**. Her değişiklikten sonra hepsini koştur —
+  lexer'daki `T?` hatası ve parser'daki brace-block hatası ikisi de bu sayede çıktı.
+- Faz 0'da park edilen iki karar Faz 2'ye ait, şimdi uğraşma: tipli `catch` (#12),
+  `sys.bekle` async kısıtı (#13).
+
+---
+
+---
+
 ## 26 Temmuz 2026 — Faz 0 başladı
 
 **Dönüm noktası:** Projenin kuruluşu ve dil tanımının ilk taslağı.
