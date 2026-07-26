@@ -1,11 +1,11 @@
-# Rai
+# RaidenScript
 
 > ⚠️ **Faz 0 — tasarım aşaması.** Henüz çalışan bir derleyici yok, olması da beklenmiyor.
 > Bu depo şu an bir dil *tanımından* ve örnek programlardan ibaret.
 
-**Rai**, gömülebilir bir betik dili. Python'un okunabilirliğini, JavaScript'in
-çalışma modelini, C++'ın isteğe bağlı tiplerini ve HTML'in bildirimsel arayüz
-fikrini tek dilde birleştirmeyi hedefliyor.
+**RaidenScript** (kısaca **RS**), gömülebilir bir betik dili. Python'un okunabilirliğini,
+JavaScript'in çalışma modelini, C++'ın isteğe bağlı tiplerini ve HTML'in bildirimsel
+arayüz fikrini tek dilde birleştirmeyi hedefliyor.
 
 ```python
 fn selamla(ad: str) -> str:
@@ -32,11 +32,22 @@ masaüstü uygulamasına otomasyon.
 Dil çekirdeği kasıtlı olarak küçük (28 anahtar kelime). Güç, host'un sağladığı
 bağlayıcılardan gelir.
 
+## Adlandırma
+
+| | |
+|---|---|
+| Tam ad | RaidenScript |
+| Kısaltma | RS |
+| Komut | `rs` |
+| Uzantı | `.rai` — "**Rai**den"in ilk 3 harfi, aynı zamanda 雷 (gök gürültüsü) kökü |
+
+`.rs` kullanılamaz (Rust'ın), `.rds` R'ın, `.rsc` MikroTik'in, `.ra` RealAudio'nun.
+
 ## Yol haritası
 
 | Faz | İş | Durum |
 |---|---|---|
-| 0 | Dil tanımı + örnek programlar | 🟡 sürüyor |
+| 0 | Dil tanımı + örnek programlar | 🟡 sürüyor (7/30 örnek) |
 | 1 | Lexer, parser, AST, tree-walking yorumlayıcı | ⬜ |
 | 2 | Kademeli tipler, nil-güvenliği, stdlib | ⬜ |
 | 3 | Bytecode VM + çöp toplayıcı | ⬜ |

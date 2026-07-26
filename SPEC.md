@@ -1,14 +1,24 @@
-# Rai — Dil Tanımı (v0, taslak)
+# RaidenScript — Dil Tanımı (v0, taslak)
 
 > **Durum:** Faz 0 — tasarım. Henüz tek satır derleyici kodu yok ve olmamalı.
-> **Kod adı:** `rai` (geçici — isim kesinleşince tek seferde değişir)
 > **Son güncelleme:** 26 Temmuz 2026
+
+| | | |
+|---|---|---|
+| **Tam ad** | RaidenScript | |
+| **Kısaltma** | RS | |
+| **Komut** | `rs` | 2 harf — günde yüzlerce kez yazılacak |
+| **Uzantı** | `.rai` | "**Rai**den"in ilk 3 harfi + 雷 (rai = gök gürültüsü) kökü |
+| **Repo** | `github.com/RaidenTechnology/raidenscript` | |
+
+**Alınamayan uzantılar ve sebepleri** (26 Tem'de doğrulandı, bir daha araştırılmasın):
+`.rs` Rust'ın · `.rds` R'ın serileştirme formatı + AWS markası · `.rsc` MikroTik RouterOS betiklerinin · `.ra` RealAudio'nun
 
 ---
 
 ## 1. Bu dil ne?
 
-Rai, **gömülebilir bir betik dili**. Tek başına çalışan programlar yazılabilir, ama asıl varlık sebebi başka bir uygulamanın içine girip ona programlanabilirlik kazandırmak: oyuna mod, sunucuya plugin, masaüstü uygulamasına otomasyon.
+RaidenScript, **gömülebilir bir betik dili**. Tek başına çalışan programlar yazılabilir, ama asıl varlık sebebi başka bir uygulamanın içine girip ona programlanabilirlik kazandırmak: oyuna mod, sunucuya plugin, masaüstü uygulamasına otomasyon.
 
 Dört dilden beslenir ve her birinden farklı bir katman alır:
 
@@ -58,7 +68,7 @@ Bu tablo dilin karakterini belirler. Her satırın bir gerekçesi var; gerekçe 
 | Aralık | `0..10` (hariç), `0..=10` (dahil) | Rust'ın açıklığı; Python'un `range()` fonksiyon çağrısından daha okunur |
 | Modüller | `use "github.com/kullanici/repo"` | Go modeli — registry yok, sunucu yok, hesap yok, domain yok |
 | Yorum | `#` satır sonuna kadar | Python |
-| Dosya uzantısı | `.rai` | Çakışan canlı format yok (doğrulandı: sadece ölü/niş formatlar) |
+| Dosya uzantısı | `.rai` | "Rai"den + 雷 kökü. Çakışan canlı format yok. `.rs`/`.rds`/`.rsc`/`.ra` alınamaz — yukarıdaki nota bak |
 
 ---
 
@@ -244,8 +254,8 @@ async fn main():
 ```python
 use std.math                              # yerleşik kütüphane
 use std.json as j                         # yeniden adlandırma
-use "github.com/RaidenTechnology/rai-http"          # repo bazlı
-use "github.com/RaidenTechnology/rai-http" @ "v0.3.1"   # sürüm sabitleme
+use "github.com/RaidenTechnology/rs-http"          # repo bazlı
+use "github.com/RaidenTechnology/rs-http" @ "v0.3.1"   # sürüm sabitleme
 
 print(math.sqrt(16))
 ```
@@ -318,7 +328,7 @@ Bu tek kural, gerçek yazılımdaki hataların büyük bir dilimini kapatır —
 - Her şey referans, `int`/`float`/`bool`/`nil` değer semantiğiyle davranır.
 - **Çöp toplayıcı:** Faz 3'te mark-and-sweep. Nesil bazlı iyileştirme sonra.
 - Kapanışlar kapattıkları değişkenleri **upvalue** olarak yaşatır.
-- Host sınırında **handle tablosu**: Rai nesnesi host'a verilirken doğrudan pointer değil, tabloya indeks geçer. Bu, iki GC'nin (Rai'nin ve host'un) birbirini kilitlemesini engeller — gömme işinin en klasik sızıntı kaynağı burasıdır.
+- Host sınırında **handle tablosu**: RS nesnesi host'a verilirken doğrudan pointer değil, tabloya indeks geçer. Bu, iki GC'nin (RS'nin ve host'un) birbirini kilitlemesini engeller — gömme işinin en klasik sızıntı kaynağı burasıdır.
 
 ---
 
@@ -327,14 +337,14 @@ Bu tek kural, gerçek yazılımdaki hataların büyük bir dilimini kapatır —
 Dilin varlık sebebi. Host tarafı C API'si üzerinden konuşur:
 
 ```c
-rai_vm*  rai_new(void);
-void     rai_free(rai_vm*);
-int      rai_eval(rai_vm*, const char* src, rai_value* out);
-void     rai_bind(rai_vm*, const char* ad, rai_fn fn);   /* host fonksiyonu tanıt */
-void     rai_set_limit(rai_vm*, uint64_t adim, uint64_t bellek);  /* sonsuz döngü koruması */
+rs_vm*   rs_new(void);
+void     rs_free(rs_vm*);
+int      rs_eval(rs_vm*, const char* src, rs_value* out);
+void     rs_bind(rs_vm*, const char* ad, rs_fn fn);   /* host fonksiyonu tanıt */
+void     rs_set_limit(rs_vm*, uint64_t adim, uint64_t bellek);  /* sonsuz döngü koruması */
 ```
 
-Kritik güvenlik kuralı: **bir mod host'u kilitleyemez.** `rai_set_limit` ile adım ve bellek tavanı konur; aşan betik istisna alır, host çalışmaya devam eder.
+Kritik güvenlik kuralı: **bir mod host'u kilitleyemez.** `rs_set_limit` ile adım ve bellek tavanı konur; aşan betik istisna alır, host çalışmaya devam eder.
 
 Host bağlayıcıları (dil çekirdeğinin dışında, her proje için ayrı):
 
@@ -473,7 +483,7 @@ type           = IDENT [ "[" type { "," type } "]" ] [ "?" ]
 - `try` / `catch` / `throw`
 - `use std.*` — sadece yerleşik modüller
 - f-string
-- REPL + `rai run dosya.rai`
+- REPL + `rs run dosya.rai`
 - **Satır/sütun bilgili hata mesajları** (baştan, sonradan eklemek acı verir)
 
 ### DIŞARIDA ❌ (fazı belirtilmiş)
@@ -519,7 +529,7 @@ Bunlar spec'i okurken değil, dili *kullanırken* çıktı. Faz 1 başlamadan ka
 8. **Girinti + `view` çakışması.** JSX'in klasik belirsizliği: `a < b` karşılaştırma mı, etiket açılışı mı? Çözüm adayı: lexer'a mod desteği (Faz 1'de kullanılmasa da altyapısı konur).
 9. **`for` üzerinde çoklu değişken.** `for k, v in harita.items()` mi, yoksa demet (tuple) tipi mi eklensin? Demet eklemek çekirdeği büyütür.
 10. **String biçimlendirme dili.** `{x:.2f}` Python'ın mini dili — ne kadarı desteklenecek?
-11. **Modül önbelleği nerede yaşayacak?** `~/.rai/pkg/<host>/<kullanıcı>/<repo>@<tag>/` öneri.
+11. **Modül önbelleği nerede yaşayacak?** `~/.raidenscript/pkg/<host>/<kullanıcı>/<repo>@<tag>/` öneri.
 12. **`switch`/`match` gerekli mi?** Anahtar kelime bütçesi 28/30. `match` güçlü ama pahalı — v1.0 sonrasına bırakılabilir.
 13. **Operatör aşırı yükleme?** Muhtemelen hayır — çekirdeği küçük tutma kuralına aykırı.
 

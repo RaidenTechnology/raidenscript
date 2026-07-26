@@ -1,4 +1,4 @@
-# Rai — Çalışma Günlüğü
+# RaidenScript — Çalışma Günlüğü
 
 > Devlog'ların ham maddesi. Her dönüm noktasında güncellenir.
 
@@ -56,4 +56,40 @@ En kritik ikisi:
 - §11a'daki 7 bulgu karara bağlanacak, gramer güncellenecek.
 - Sonra Faz 1: lexer → Pratt parser → AST → resolver → tree-walking yorumlayıcı.
 
-**Not:** Dilin adı henüz kesin değil. `rai` kod adı olarak kullanılıyor.
+---
+
+## 26 Temmuz 2026 — İsim kesinleşti: **RaidenScript**
+
+Kullanıcı 8 aday önerdi, hepsi denetlendi. Kazanan **RaidenScript** — aynı adda dil
+veya kayda değer proje olmadığı doğrulandı.
+
+**Şema:** `RaidenScript` / kısaltma **RS** / komut `rs` / uzantı `.rai`
+
+### Elenenler ve sebepleri (bir daha tartışılmasın)
+
+| Aday | Neden elendi |
+|---|---|
+| RaidenScriptus | Uydurma Latince ek, yazım hatası gibi okunuyor |
+| RaidenScripter | "Scripter" = betik yazan *kişi*; aracı değil kullanıcıyı adlandırıyor |
+| RaidenScripturam | 17 karakter, *scriptura* = kutsal metin çağrışımı |
+| RaidenScraptus | **"Scrap" = hurda/çöp.** Bir dil için felaket çağrışım |
+| RaidenOS | İşletim sistemi adı — yanlış kategori |
+| Raiden++ | `+` paket adı/URL'de geçersiz; arama motorları `++`'ı yutar → aranamaz |
+| Raiden# | Yukarıdakiler + **`#` dilin kendi yorum karakteri**; URL'de fragment ayracı |
+
+### Uzantı kararı
+
+`.rai` seçildi. "**Rai**den"in ilk üç harfi *ve* 雷 (rai = gök gürültüsü) kökü —
+çift anlam. Örnekler zaten bu uzantıdaydı, sıfır yeniden iş.
+
+**Alınamayan uzantılar (doğrulandı, bir daha araştırılmasın):**
+`.rs` Rust'ın · `.rds` R'ın serileştirme formatı + AWS RDS markası ·
+`.rsc` MikroTik RouterOS betikleri · `.ra` RealAudio ·
+`.raisc`/`.rasc`/`.rdsc`/`.rdnsc` telaffuz/uzunluk sorunları
+
+### Uygulanan değişiklikler
+
+- `SPEC.md` başlık + adlandırma tablosu, C API `rai_*` → `rs_*`,
+  modül önbelleği `~/.raidenscript/pkg/`, örnek paket `rs-http`, `rs run dosya.rai`
+- `README.md` yeniden yazıldı (adlandırma bölümü eklendi)
+- Proje klasörü `rai/` → `raidenscript/`
