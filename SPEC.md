@@ -459,6 +459,23 @@ Lexer `INDENT` / `DEDENT` / `NEWLINE` token'ları üretir (Python modeli), ama �
 
 Ayrıca: `#` satır sonuna kadar yorumdur ve string içinde özel anlamı yoktur.
 
+### Lexer yazılırken netleşenler (Faz 1/2, 26 Tem)
+
+- **Tanımlayıcılar UTF-8'dir.** ASCII harf, `_` ve **tüm çok baytlı karakterler**
+  tanımlayıcı başlatabilir. Yani `ateş`, `sayaç`, `öğüşçı`, `yıldırım` geçerli
+  isimlerdir. Spec bunu söylememişti; Türkçe yazan biri için dilin en somut
+  kolaylıklarından biri olduğu için **evet** diye karara bağlandı.
+- **Bilimsel gösterim eklendi:** `1e10`, `2.5e-3`. İHA telemetrisi gibi sayısal
+  kodda kaçınılmaz.
+- **`.` ancak ardından RAKAM gelirse ondalık noktadır.** Bu kural olmadan `1..10`
+  aralığı `1.` + `.10` diye taranıp aralık sözdizimi çökerdi.
+- **Çıplak `?` bir token'dır (`Question`), hata değil.** `T?` nullable tip eki
+  için gerekli. Lexer `?.` ile `?` arasında anlam ayrımı YAPMAZ — bağlamı parser
+  bilir. (Bu, 15 örnek üzerinde koşulan bütünleşme testinde yakalandı: lexer
+  önce çıplak `?`'i hata sayıyordu ve `08`/`13` bu yüzden taranamıyordu.)
+- **Girintide sekme yasak**, hata verilir. Karışık sekme/boşluk girintisi Python'un
+  en bilinen yarasıdır; baştan kapatıldı.
+
 ```ebnf
 program        = { statement } EOF ;
 

@@ -2,19 +2,22 @@
 //
 // Faz 1 ilerleyişi:
 //   [x] 1. iskelet + kaynak/konum katmanı + tanılama motoru
-//   [ ] 2. lexer
+//   [x] 2. lexer
 //   [ ] 3. AST
 //   [ ] 4. parser
 //   [ ] 5. resolver
 //   [ ] 6. yorumlayıcı
 //   [ ] 7. REPL
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "diag.hpp"
+#include "lexer.hpp"
 #include "source.hpp"
+#include "token.hpp"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -49,7 +52,59 @@ void yardim() {
            "  rs --help              bu yardım\n"
            "\n"
            "GELİŞTİRME:\n"
+           "  rs tokens <dosya.rai>  token dökümü\n"
            "  rs tani <dosya.rai>    tanılama motorunu dosya üzerinde göster\n";
+}
+
+int komutTokens(const std::string& yol) {
+    auto kaynak = rs::Source::fromFile(yol);
+    if (!kaynak) {
+        std::cerr << "hata: dosya okunamadı: " << yol << '\n';
+        return 1;
+    }
+
+    rs::Diagnostics tani(*kaynak);
+    rs::Lexer lexer(*kaynak, tani);
+    const auto tokenlar = lexer.tokenize();
+
+    int girinti = 0;
+    for (const auto& t : tokenlar) {
+        if (t.kind == rs::Tok::Dedent) {
+            --girinti;
+        }
+
+        const auto lc = kaynak->lineCol(t.span.offset);
+        std::cout << std::setw(4) << lc.line << ':' << std::left << std::setw(4) << lc.col
+                  << std::right << std::string(static_cast<std::size_t>(girinti > 0 ? girinti * 2 : 0), ' ')
+                  << rs::tokName(t.kind);
+
+        switch (t.kind) {
+            case rs::Tok::Ident:
+            case rs::Tok::Str:
+            case rs::Tok::RawStr:
+            case rs::Tok::FStr:
+                std::cout << "  " << t.text;
+                break;
+            case rs::Tok::Int:
+                std::cout << "  " << t.ival;
+                break;
+            case rs::Tok::Float:
+                std::cout << "  " << t.fval;
+                break;
+            default:
+                break;
+        }
+        std::cout << '\n';
+
+        if (t.kind == rs::Tok::Indent) {
+            ++girinti;
+        }
+    }
+
+    std::cout << '\n' << tokenlar.size() << " token\n";
+    tani.print(std::cout);
+    tani.printSummary(std::cout);
+    return tani.hasErrors() ? 1 : 0;
 }
 
 int komutRun(const std::string& yol) {
@@ -130,6 +185,13 @@ int main(int argc, char** argv) {
             return 1;
         }
         return komutRun(arg[1]);
+    }
+    if (ilk == "tokens") {
+        if (arg.size() < 2) {
+            std::cerr << "hata: 'tokens' bir dosya adı bekliyor\n";
+            return 1;
+        }
+        return komutTokens(arg[1]);
     }
     if (ilk == "tani") {
         if (arg.size() < 2) {

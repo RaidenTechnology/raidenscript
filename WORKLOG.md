@@ -247,3 +247,62 @@ yazıldı ki bundan sonraki her modül ilk günden düzgün hata versin.
 
 Faz 1 / adım 2: **lexer** — token tipleri, INDENT/DEDENT üretimi, f-string
 alt-lexer'ı, `brace_block` modu, `=>` sonrası `{` ayrımı (SPEC §9 lexer kuralları).
+
+---
+
+## 26 Temmuz 2026 — Faz 1 / adım 2: LEXER çalışıyor
+
+**Dönüm noktası:** 15 örneğin tamamı temiz taranıyor — 6.889 token, sıfır hata.
+
+### Yazılanlar
+
+| Dosya | İş |
+|---|---|
+| `src/token.hpp/.cpp` | `Tok` enum'u, `Token`, 32 girişlik anahtar kelime tablosu, okunur adlar |
+| `src/lexer.hpp/.cpp` | Tarayıcının kendisi (~470 satır) |
+| `src/main.cpp` | `rs tokens <dosya>` — girintiye göre hizalanmış token dökümü |
+
+### SPEC §9'daki dört kural da uygulandı ve doğrulandı
+
+| Kural | Sınama | Sonuç |
+|---|---|---|
+| 1. Parantez derinliği girintiyi bastırır | Çok satırlı map literal'i | ✅ içinde NEWLINE üretilmiyor |
+| 2. `brace_block` içinde NEWLINE var, INDENT/DEDENT yok | `(olay) => { ... }` | ✅ deyimler ayrılıyor |
+| 3. f-string gövdesi ham tutulur | `f"{olay.hedef.ad} vuruldu"` | ✅ parser'a bırakıldı |
+| 4. `=>` sonrası `{` her zaman blok | Aynı dosyada map + blok | ✅ `lastSignificant_` ile ayrılıyor |
+
+### Lexer yazarken netleşen kararlar (SPEC §9'a işlendi)
+
+- **Tanımlayıcılar UTF-8** → `ateş`, `sayaç`, `yıldırım` geçerli isimler.
+  Spec söylememişti; Türkçe yazan biri için en somut kolaylık olduğu için evet.
+- **Bilimsel gösterim** (`1e10`, `2.5e-3`) eklendi — sayısal kodda kaçınılmaz.
+- **`.` ancak ardından RAKAM gelirse ondalık noktadır.** Bu kural olmasa `1..10`
+  aralığı `1.` + `.10` diye taranıp aralık sözdizimi çökerdi. Token dökümünde
+  doğrulandı: `1` `..` `10`.
+- **Girintide sekme yasak** — Python'un en bilinen yarası baştan kapatıldı.
+
+### 🐛 Bütünleşme testinin yakaladığı hata
+
+15 örneğin hepsini taramak **2 dosyada hata** verdi: `08-tipler` ve `13-iha-telemetri`,
+ikisi de "beklenmeyen '?'". Sebep: lexer çıplak `?`'i hata sayıyordu, ama SPEC §4'teki
+`T?` nullable tip eki tam olarak çıplak `?` kullanıyor (`-> Oyuncu?`).
+
+**Düzeltme:** `Tok::Question` eklendi. Doğrusu lexer'ın karar vermemesi —
+`?.` mı `T?` mi olduğunu bağlam belirler, o da parser'ın işi.
+
+Ders: tek dosyalık sınamalar bunu bulamazdı. Örnek koleksiyonunu **regresyon
+takımı** olarak koşmak Faz 0'ın beklenmedik ikinci getirisi oldu.
+
+### Doğrulama
+
+- `-Wall -Wextra -Wpedantic -Wshadow -Wconversion` → sıfır uyarı
+- 15/15 örnek temiz, 6.889 token
+- Hata yolu: kapanmamış metin, bilinmeyen kaçış, `!`, `?`, kapanmamış `(`
+  → beşi de konum + ok işareti + ipucu ile raporlandı, **tarama durmadı**
+  (kullanıcı hepsini tek seferde görüyor)
+- UTF-8 sütunlar doğru: `sayaç = ` satırında `=` sütun 7 (bayt sayılsaydı 8)
+
+### Sırada
+
+Faz 1 / adım 3-4: **AST + parser**. Recursive descent (deyimler) + Pratt (ifadeler),
+SPEC §8 öncelik tablosu birebir uygulanacak.
