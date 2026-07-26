@@ -26,6 +26,15 @@ std::optional<Source> Source::fromFile(const std::filesystem::path& yol) {
 
     std::string icerik = ss.str();
 
+    // UTF-8 BOM'u at. Windows editörleri (Not Defteri, PowerShell Out-File,
+    // bazen VS Code) dosya başına EF BB BF koyar. Lexer bunu çok baytlı bir
+    // karakter sanıp ilk tanımlayıcıya yapıştırıyordu — görünmez bir hata.
+    if (icerik.size() >= 3 && static_cast<unsigned char>(icerik[0]) == 0xEF &&
+        static_cast<unsigned char>(icerik[1]) == 0xBB &&
+        static_cast<unsigned char>(icerik[2]) == 0xBF) {
+        icerik.erase(0, 3);
+    }
+
     // CRLF -> LF. Windows'ta yazılmış dosyalar lexer'a hep temiz gelsin.
     icerik.erase(std::remove(icerik.begin(), icerik.end(), '\r'), icerik.end());
 

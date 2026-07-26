@@ -86,7 +86,8 @@ void Lexer::emitValue(Token t) {
 
 bool Lexer::newlineAllowed() const noexcept {
     // Kural 1: parantez/köşeli/map-süslü içinde satır sonu yutulur.
-    // Kural 2: blok-süslü içinde satır sonu ANLAMLIDIR (deyimleri ayırır).
+    // Kural 2: blok-süslü içinde satır sonu ANLAMLIDIR (deyimleri ayırır)
+    //          ve girinti de izlenir (bkz indentTracked).
     return nesting_.empty() || nesting_.back() == Nest::BlockBrace;
 }
 

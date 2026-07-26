@@ -50,7 +50,11 @@ private:
 
     // --- yardımcılar ---
     [[nodiscard]] bool newlineAllowed() const noexcept;
-    [[nodiscard]] bool indentTracked() const noexcept { return nesting_.empty(); }
+
+    // brace_block KENDİ girinti bağlamını taşır: içinde 'if x:' yazılabilmesi
+    // için INDENT/DEDENT üretilmek ZORUNDA. (İlk tasarımda bastırılıyordu;
+    // 09 ve 13 numaralı örnekler bunun imkânsız olduğunu gösterdi.)
+    [[nodiscard]] bool indentTracked() const noexcept { return newlineAllowed(); }
     [[nodiscard]] Span here(std::uint32_t basla) const noexcept;
     void closeNest(Nest beklenen, Tok kind, Span span);
 

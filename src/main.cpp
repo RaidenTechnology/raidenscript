@@ -14,8 +14,10 @@
 #include <string_view>
 #include <vector>
 
+#include "astdump.hpp"
 #include "diag.hpp"
 #include "lexer.hpp"
+#include "parser.hpp"
 #include "source.hpp"
 #include "token.hpp"
 
@@ -53,7 +55,30 @@ void yardim() {
            "\n"
            "GELİŞTİRME:\n"
            "  rs tokens <dosya.rai>  token dökümü\n"
+           "  rs ast <dosya.rai>     sözdizimi ağacı dökümü\n"
            "  rs tani <dosya.rai>    tanılama motorunu dosya üzerinde göster\n";
+}
+
+int komutAst(const std::string& yol, bool sessiz) {
+    auto kaynak = rs::Source::fromFile(yol);
+    if (!kaynak) {
+        std::cerr << "hata: dosya okunamadı: " << yol << '\n';
+        return 1;
+    }
+
+    rs::Diagnostics tani(*kaynak);
+    rs::Lexer lexer(*kaynak, tani);
+    rs::Parser parser(*kaynak, lexer.tokenize(), tani);
+    const rs::Program prog = parser.parseProgram();
+
+    if (!sessiz) {
+        rs::AstDumper dumper(std::cout, *kaynak);
+        dumper.dump(prog);
+        std::cout << '\n';
+    }
+    tani.print(std::cout);
+    tani.printSummary(std::cout);
+    return tani.hasErrors() ? 1 : 0;
 }
 
 int komutTokens(const std::string& yol) {
@@ -192,6 +217,14 @@ int main(int argc, char** argv) {
             return 1;
         }
         return komutTokens(arg[1]);
+    }
+    if (ilk == "ast") {
+        if (arg.size() < 2) {
+            std::cerr << "hata: 'ast' bir dosya adı bekliyor\n";
+            return 1;
+        }
+        const bool sessiz = arg.size() > 2 && arg[2] == "--sessiz";
+        return komutAst(arg[1], sessiz);
     }
     if (ilk == "tani") {
         if (arg.size() < 2) {

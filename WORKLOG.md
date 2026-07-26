@@ -306,3 +306,72 @@ takımı** olarak koşmak Faz 0'ın beklenmedik ikinci getirisi oldu.
 
 Faz 1 / adım 3-4: **AST + parser**. Recursive descent (deyimler) + Pratt (ifadeler),
 SPEC §8 öncelik tablosu birebir uygulanacak.
+
+---
+
+## 26 Temmuz 2026 — Faz 1 / adım 3-4: AST + PARSER çalışıyor
+
+**Dönüm noktası:** 15 örneğin tamamı ayrıştırılıyor. Elimizde artık sözdizimi ağacı var.
+
+### Yazılanlar
+
+| Dosya | İş |
+|---|---|
+| `src/ast.hpp` | 20 ifade + 16 deyim düğümü, `TypeNode`, `Param`, `Program` |
+| `src/parser.hpp/.cpp` | Özyinelemeli iniş (deyim) + öncelik tırmanışı (ifade) |
+| `src/astdump.hpp/.cpp` | Ağacı yazdıran ziyaretçi |
+| `src/main.cpp` | `rs ast <dosya> [--sessiz]` |
+
+### C++ kalıp kararları
+
+- **Temsil: sanal hiyerarşi + Ziyaretçi.** `std::variant` + `std::visit` düşünüldü
+  ama 36 alternatifle özyinelemeli variant hem derlemeyi şişiriyor hem hata
+  mesajlarını okunmaz kılıyor.
+- **`accept()` gövdeleri için CRTP.** `ExprNode<D>` / `StmtNode<D>` sayesinde
+  36 düğümde aynı tek satır elle yazılmadı.
+- **Öncelik tırmanışı, tablo sürücülü Pratt değil.** Gramer sabit olduğu için
+  tablo esneklik kazandırmıyor; 11 kademe = 11 fonksiyon, okunması çok daha kolay.
+  `**` ve koşullu ifade sağ birleşmeli — `2**3**2` ağacı doğrulandı (`2**(3**2)`).
+
+### 🔴 En önemli bulgu: SPEC §9 KURAL 2 YANLIŞTI
+
+`brace_block` içinde INDENT/DEDENT bastırılınca şu **ayrıştırılamıyor**:
+
+```
+kaydet("vurulma", (olay) => {
+    if olay.kritik:
+        hasar = hasar * 2      ← bu girinti lexer'a hiç ulaşmıyordu
+})
+```
+
+Bastırma kararı `(` ve `[` için doğru (içleri tek bir ifade), ama `brace_block`
+**deyim** içeriyor ve deyimler blok yapısına muhtaç.
+
+**Düzeltme:** brace_block kendi girinti bağlamını açar — NEWLINE de INDENT/DEDENT
+de üretilir. Deyim sonu ayrıca `;` ve `}` önü olarak kabul edilir (tek satırlık
+`=> { x = 1 }` için). Lexer + parser + SPEC üçü birden güncellendi.
+
+### Diğer iki bulgu
+
+- **Sınıf alanında tip artık isteğe bağlı** (#15). Gramer `IDENT ":" type` zorunlu
+  kılıyordu ama `06`/`10`'da `ad = "PLASMA LANCE"` yazmıştım — kademeli tip
+  felsefesiyle çelişiyordu.
+- **UTF-8 BOM atlanıyor** (#16). Windows editörleri dosya başına `EF BB BF` koyuyor;
+  lexer bunu çok baytlı karakter sanıp **ilk tanımlayıcıya yapıştırıyordu**
+  (`kademe` yerine `﻿kademe`). Görünmez bir hataydı, AST dökümünde yakalandı.
+
+### Doğrulama
+
+- Sıfır derleyici uyarısı (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion`)
+- **15/15 örnek ayrıştırılıyor**
+- Sağ birleşme doğrulandı: `2 ** 3 ** 2` → `2 ** (3 ** 2)`
+- Zincirli koşullu ifade doğru iç içe geçiyor
+- f-string alt-lexer'ı çalışıyor: `f"{o.ad} → {o.hp:.1f} kaldı"` → 4 parça,
+  biçim eki `.1f` ayrı yakalandı
+- `a.b?.c[1..]` → indeks(alan?.(alan.(ad))) + açık uçlu aralık
+
+### Sırada
+
+Faz 1 / adım 5-6: **resolver + yorumlayıcı**. Kapsam zinciri, isim çözümleme,
+kapanış upvalue'ları; sonra ağaç yürüyen değerlendirici.
+Ondan sonra `rs run examples/01-temeller.rai` gerçekten çalışacak.

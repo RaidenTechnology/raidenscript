@@ -445,9 +445,14 @@ Lexer `INDENT` / `DEDENT` / `NEWLINE` token'ları üretir (Python modeli), ama �
 
 1. **Parantez derinliği girintiyi bastırır.** `(`, `[`, `{` içindeyken `NEWLINE`,
    `INDENT` ve `DEDENT` üretilmez — ifade satırlara serbestçe yayılır.
-2. **`brace_block` içinde `INDENT`/`DEDENT` yok.** Deyimler `NEWLINE` veya `;` ile
-   ayrılır. Bu, `() => { ... }` kalıbının bir fonksiyon çağrısının parantezi içinde
-   yazılabilmesini sağlar — girintiyle çözülemeyecek tek durum budur.
+2. **`brace_block` KENDİ girinti bağlamını açar.** İçinde `NEWLINE` anlamlıdır
+   (deyimleri ayırır) **ve `INDENT`/`DEDENT` üretilir**. Böylece `() => { ... }`
+   bir fonksiyon çağrısının parantezi içinde yazılabilir *ve* içine `if`/`while`
+   gibi bileşik deyimler konabilir.
+   > ⚠️ İlk tasarımda burada INDENT/DEDENT **bastırılıyordu**. Parser yazılırken
+   > `examples/09` ve `13` bunun imkânsız olduğunu gösterdi: bastırılınca süslü
+   > gövdedeki `if x:` bloğunun gövdesini ifade etmenin hiçbir yolu kalmıyor.
+   > Deyim sonu ayrıca `;` ve `}` önü olarak da kabul edilir (tek satırlık gövde).
 3. **f-string'in `{...}` bölümü alt-lexer'la yeniden taranır.** İçeride tam bir ifade
    vardır ve dış string'in tırnağı iç ifadeyi bağlamaz:
    `f"kredi: {oyuncu["kredi"]}"` geçerlidir.
@@ -510,7 +515,8 @@ decorator      = "@" IDENT [ "(" [ args ] ")" ] NEWLINE ;
 
 class_decl     = "class" IDENT [ "(" IDENT { "," IDENT } ")" ] ":" NEWLINE
                  INDENT { field_decl | fn_decl } DEDENT ;
-field_decl     = IDENT ":" type [ "=" expr ] NEWLINE ;
+field_decl     = IDENT ( ":" type [ "=" expr ] | "=" expr ) NEWLINE ;
+               (* tip İSTEĞE BAĞLI: 'ad = "Falcon"' geçerli, tipi değerden çıkarılır *)
 
 trait_decl     = "trait" IDENT ":" NEWLINE
                  INDENT { "fn" IDENT "(" [ params ] ")" [ "->" type ] NEWLINE } DEDENT ;
@@ -666,6 +672,26 @@ bunları asla göstermezdi.
     modelinde bu host'u dondurur — gömülü bir betikte kabul edilemez.
     **Karar: `sys.bekle` sadece `async fn` içinde `await` ile kullanılabilir.**
     Senkron bloklama yok. Faz 3'te (async gelince) uygulanacak.
+
+### 11a-4. Parser yazılırken çıkanlar (Faz 1/3-4, 26 Tem)
+
+14. **🔴 KURAL 2 YANLIŞTI — düzeltildi.** `brace_block` içinde INDENT/DEDENT
+    bastırılınca, süslü gövdedeki `if x:` bloğunun gövdesini ifade etmenin hiçbir
+    yolu kalmıyor. `examples/09` ve `13` bunu ayrıştırılamaz hâle getirdi.
+    **Karar: brace_block kendi girinti bağlamını açar** — NEWLINE de INDENT/DEDENT
+    de üretilir. Ayrıca deyim sonu `;` ve `}` önü olarak da kabul edilir, böylece
+    tek satırlık `=> { x = 1 }` çalışır. §9 kural 2 güncellendi.
+
+15. **✅ Sınıf alanında tip artık isteğe bağlı.** Gramer `IDENT ":" type` zorunlu
+    kılıyordu ama `06` ve `10`'da `ad = "PLASMA LANCE"` yazmıştım. Kademeli tip
+    felsefesiyle çelişiyordu. **Karar: `IDENT ( ":" type [ "=" expr ] | "=" expr )`**
+    — ikisinden en az biri olmalı, tip yoksa değerden çıkarılır.
+
+16. **✅ UTF-8 BOM atlanıyor.** Windows editörleri (Not Defteri, PowerShell
+    `Out-File`, bazen VS Code) dosya başına `EF BB BF` koyuyor. Lexer bunu çok
+    baytlı bir karakter sanıp **ilk tanımlayıcıya yapıştırıyordu** — `kademe`
+    yerine `﻿kademe`. Görünmez bir hata; AST dökümünde yakalandı.
+    `Source::fromFile` artık BOM'u kırpıyor.
 
 ### 11b. Baştan bilinen açık sorular
 
