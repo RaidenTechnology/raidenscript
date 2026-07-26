@@ -16,6 +16,7 @@
 
 #include "astdump.hpp"
 #include "diag.hpp"
+#include "interp.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "resolver.hpp"
@@ -181,12 +182,35 @@ int komutRun(const std::string& yol) {
         return 1;
     }
 
-    std::cout << kaynak->name() << "\n"
-              << "  " << kaynak->size() << " bayt, "
-              << kaynak->lineCount() << " satır\n\n";
+    rs::Diagnostics tani(*kaynak);
+    rs::Lexer lexer(*kaynak, tani);
+    rs::Parser parser(*kaynak, lexer.tokenize(), tani);
+    const rs::Program prog = parser.parseProgram();
 
-    std::cout << "Lexer henüz yazılmadı (Faz 1 / adım 2).\n"
-                 "Kaynak ve tanılama katmanı hazır: 'rs tani " << yol << "'\n";
+    if (tani.hasErrors()) {
+        tani.print(std::cerr);
+        tani.printSummary(std::cerr);
+        return 1;
+    }
+
+    // Resolver yalnızca DENETLER; uyarıları bastırıyoruz ki program çıktısı
+    // temiz kalsın. Denetim için 'rs coz' var.
+    rs::Diagnostics cozTani(*kaynak);
+    rs::Resolver resolver(*kaynak, cozTani);
+    resolver.resolve(prog);
+    if (cozTani.hasErrors()) {
+        cozTani.print(std::cerr);
+        cozTani.printSummary(std::cerr);
+        return 1;
+    }
+
+    rs::Interpreter yorumlayici(*kaynak, tani);
+    const bool tamam = yorumlayici.run(prog);
+    if (!tamam) {
+        tani.print(std::cerr);
+        tani.printSummary(std::cerr);
+        return 1;
+    }
     return 0;
 }
 

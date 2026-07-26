@@ -14,9 +14,11 @@
 [x] 3  AST                      20 ifade + 16 deyim düğümü
 [x] 4  parser                   15/15 örnek ayrışıyor
 [x] 5  resolver                 15/15 temiz, 1.044 isim çözüldü
-[ ] 6  yorumlayıcı       ← SIRADAKİ İŞ
-[ ] 7  REPL
+[x] 6  yorumlayıcı              ✅ rs run ÇALIŞIYOR — 10/10 örnek
+[ ] 7  REPL              ← SIRADAKİ İŞ (küçük)
 ```
+
+🎉 **`rs run examples/01-temeller.rai` çalışıyor.** Faz 1'in hedefi tutturuldu.
 
 **Derleme:** `powershell -File build.ps1` (w64devkit'i kendi bulur)
 **Sınama:** `build\rs.exe ast examples\12-algoritmalar.rai`
@@ -65,7 +67,52 @@ Yeni dosya `src/resolver.hpp/.cpp`. `ExprVisitor` + `StmtVisitor` uygulayacak
    `any` tipini alır ve uyarı üretir.
 6. **`self` / `super` bağlamı.** Metot dışında kullanılırsa hata.
 
-### Adım 6 — Yorumlayıcı: ne yapacak
+### ✅ Adım 6 BİTTİ (26 Tem) — `src/value.*` + `src/interp.*`
+
+**`rs run` çalışıyor. 10/10 çalışabilir örnek geçiyor, 0 gerçek hata.**
+Kalan 5 örnek (`06/07/08/10/13`) host bağlayıcısı bekliyor — tasarım gereği,
+`game.*`/`mc.*`/`sys.*`/`serial.*` Faz 4'te gelecek.
+
+**Temsil kararı:** değerlerde `std::variant` DOĞRU araç (12 alternatif, özyineleme
+shared_ptr ile kırılıyor, `std::visit` tam olarak ihtiyaç). AST'de 36 alternatifle
+reddedilmişti — aynı araç, farklı ölçekte farklı sonuç.
+
+**Akış kontrolü C++ istisnasıyla:** `ReturnSignal`/`BreakSignal`/`ContinueSignal`/
+`ScriptThrow`. Tree-walk'ta en temiz yol; her `visit()`'in sinyal döndürmesi gerekmiyor.
+
+**Prelude'un bir kısmı RaidenScript'te yazıldı.** `Error` sınıfı `PRELUDE_SRC`
+içinde dilin kendisiyle tanımlı — bu sayede `class YetersizKredi(Error)` ve
+`super.init(msg)` hiçbir özel durum kodu olmadan çalışıyor.
+
+**Doğrulanan spec davranışları:**
+- ✅ Doğruluk: `if sayac:` (sayac=0) bloğa GİRDİ, `if bos:` (nil) girmedi
+- ✅ `/` her zaman float (`10 / 4 = 2.5`), `//` tam bölme (negatiflerde aşağı yuvarlama)
+- ✅ `**` sağ birleşmeli — `2 ** 3 ** 2 = 512` (64 değil)
+- ✅ Kapanış + notlama: `fib(50) = 12586269025` anında
+- ✅ Kalıtım, `super.init`, metot geçersiz kılma, `is` ile alt sınıf kontrolü
+- ✅ try/catch/finally, özel hata sınıfları
+- ✅ UTF-8: `'Yıldırım'.len() == 8`, Türkçe i/İ ve ı/I dönüşümü doğru
+
+**🔴 Çalıştırırken çıkan tasarım kararı: haritalarda nokta erişimi.**
+`05` çalışmadı çünkü `oyuncu = {"kredi": 300}` bir harita ama `oyuncu.kredi`
+yazmıştım. Önce "örnek hatalı" sandım — ama daha derin bir sorun: **host'tan gelen
+olay verileri harita olarak gelir.** `06`'daki `olay.hedef.hp`, `10`'daki
+`olay.oyuncu` hep bu kalıba dayanıyor. Nokta erişimi haritalarda çalışmazsa
+gömme API'si `olay["hedef"]["hp"]` gibi okunmaz hâle gelir.
+**Karar: haritalarda nokta erişimi desteklenir** (JS/Lua gibi), okuma ve yazma
+ikisi de. **Yerleşik metotlar öncelikli** — `harita.len` metottur, anahtar değil;
+çakışan anahtar için `harita["len"]` yazılır.
+
+**Ek:** `std.math` uygulandı (sqrt/sin/cos/tan/log/exp/floor/ceil/abs/atan2/pow/
+min/max + PI/E). Tam modül sistemi Faz 4'te ama bu 30 satır `15-mini-hesaplayici`'yi
+tam çalışır hâle getirdi.
+
+**Bilinen sınırlama:** döngüsel referanslar (`a.b = a`) sızdırıyor — `shared_ptr`
+kullanıldığı için. Çöp toplayıcı Faz 3'ün işi, bilinen ve kabul edilen.
+
+---
+
+### Adım 6 — Yorumlayıcı: ne yapacak (plan, tamamlandı)
 
 Yeni dosya `src/value.hpp` (değer temsili) + `src/interp.hpp/.cpp`.
 
