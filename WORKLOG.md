@@ -13,15 +13,41 @@
 [x] 2  lexer                    15/15 örnek, 6.889 token
 [x] 3  AST                      20 ifade + 16 deyim düğümü
 [x] 4  parser                   15/15 örnek ayrışıyor
-[ ] 5  resolver          ← SIRADAKİ İŞ
-[ ] 6  yorumlayıcı
+[x] 5  resolver                 15/15 temiz, 1.044 isim çözüldü
+[ ] 6  yorumlayıcı       ← SIRADAKİ İŞ
 [ ] 7  REPL
 ```
 
 **Derleme:** `powershell -File build.ps1` (w64devkit'i kendi bulur)
 **Sınama:** `build\rs.exe ast examples\12-algoritmalar.rai`
 
-### Adım 5 — Resolver: ne yapacak
+### ✅ Adım 5 BİTTİ (26 Tem) — `src/resolver.hpp/.cpp`
+
+15/15 örnek temiz geçiyor, **1.044 isim çözüldü**. Çözümler AST'ye yazılmıyor,
+`unordered_map<const Expr*, Resolution>` yan tablosunda duruyor — ağaç değişmedi.
+
+**Doğrulanan davranışlar:**
+- Kapanış yakalama: `02-fonksiyonlar` 3 upvalue, `12-algoritmalar` 7 upvalue
+  (notlamalı fibonacci'nin `onbellek` + `fib` yakalaması), `09` 1 upvalue
+- Host ayrımı kendiliğinden çalıştı: `06` 13 host (`game.*`), `10` 12 host (`mc.*`),
+  `13` 5 host (`serial.*`), `07` 7 host (`sys.*`) — gömme tezi veriye yansıdı
+- Hata yolları: `outer` dış kapsamda yoksa, `break`/`continue` döngü dışında,
+  `return` fonksiyon dışında, `self`/`super` metot dışında, `super` tabansız sınıfta
+- Uyarılar: kullanılmayan yerel değişken, hiçbir yerde tanımlanmamış ad
+
+**Eklenen kural (SPEC'e yansıtılacak): fn/class/trait adları HOIST edilir.**
+Her blokta gövdeler çözülmeden önce bu adlar tanımlanır, böylece sıralamadan
+bağımsız birbirlerini çağırabilirler. `once()` kendinden sonra tanımlanan
+`sonra()`'yı çağırabiliyor. Değişkenlerde hoisting YOK — SPEC §2'deki
+"ilk atama tanımlamadır" kuralı aynen duruyor.
+
+**🐛 Yazarken çıkan hata:** atama da değişkeni "kullanıldı" sayıyordu, bu yüzden
+hiç okunmayan ama sürekli yazılan değişkenler ölü kod uyarısı almıyordu.
+`lookup()` artık `used` bayrağını yalnızca OKUMA'da set ediyor.
+
+---
+
+### Adım 5 — Resolver: ne yapacak (plan, tamamlandı)
 
 Yeni dosya `src/resolver.hpp/.cpp`. `ExprVisitor` + `StmtVisitor` uygulayacak
 (AstDumper'ın yaptığı gibi — ağaç hiç değişmeyecek).

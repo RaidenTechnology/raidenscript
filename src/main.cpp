@@ -18,6 +18,7 @@
 #include "diag.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
+#include "resolver.hpp"
 #include "source.hpp"
 #include "token.hpp"
 
@@ -56,6 +57,7 @@ void yardim() {
            "GELİŞTİRME:\n"
            "  rs tokens <dosya.rai>  token dökümü\n"
            "  rs ast <dosya.rai>     sözdizimi ağacı dökümü\n"
+           "  rs coz <dosya.rai>     isim çözümleme (resolver)\n"
            "  rs tani <dosya.rai>    tanılama motorunu dosya üzerinde göster\n";
 }
 
@@ -77,6 +79,46 @@ int komutAst(const std::string& yol, bool sessiz) {
         std::cout << '\n';
     }
     tani.print(std::cout);
+    tani.printSummary(std::cout);
+    return tani.hasErrors() ? 1 : 0;
+}
+
+int komutCoz(const std::string& yol) {
+    auto kaynak = rs::Source::fromFile(yol);
+    if (!kaynak) {
+        std::cerr << "hata: dosya okunamadı: " << yol << '\n';
+        return 1;
+    }
+
+    rs::Diagnostics tani(*kaynak);
+    rs::Lexer lexer(*kaynak, tani);
+    rs::Parser parser(*kaynak, lexer.tokenize(), tani);
+    const rs::Program prog = parser.parseProgram();
+
+    if (tani.hasErrors()) {
+        tani.print(std::cout);
+        tani.printSummary(std::cout);
+        return 1;
+    }
+
+    rs::Resolver resolver(*kaynak, tani);
+    resolver.resolve(prog);
+
+    std::size_t yerel = 0, upvalue = 0, global = 0, host = 0;
+    for (const auto& [dugum, r] : resolver.resolutions()) {
+        (void)dugum;
+        switch (r.kind) {
+            case rs::Resolution::Kind::Local:   ++yerel;   break;
+            case rs::Resolution::Kind::Upvalue: ++upvalue; break;
+            case rs::Resolution::Kind::Global:  ++global;  break;
+            case rs::Resolution::Kind::Host:    ++host;    break;
+        }
+    }
+
+    tani.print(std::cout);
+    std::cout << resolver.resolutions().size() << " isim çözüldü — "
+              << yerel << " yerel, " << upvalue << " kapanış (upvalue), "
+              << global << " global, " << host << " host\n";
     tani.printSummary(std::cout);
     return tani.hasErrors() ? 1 : 0;
 }
@@ -225,6 +267,13 @@ int main(int argc, char** argv) {
         }
         const bool sessiz = arg.size() > 2 && arg[2] == "--sessiz";
         return komutAst(arg[1], sessiz);
+    }
+    if (ilk == "coz") {
+        if (arg.size() < 2) {
+            std::cerr << "hata: 'coz' bir dosya adı bekliyor\n";
+            return 1;
+        }
+        return komutCoz(arg[1]);
     }
     if (ilk == "tani") {
         if (arg.size() < 2) {
