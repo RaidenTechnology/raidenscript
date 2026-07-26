@@ -1,0 +1,79 @@
+# Raiden RPG (Paper 1.21) plugin'i — ikinci host bağlayıcısı.
+# 'mc.*' JVM köprüsünden gelir. Dil çekirdeği değişmedi; sadece bağlayıcı farklı.
+# Aynı dilin bir tarayıcı oyununa da bir Minecraft sunucusuna da girebilmesi
+# gömme tezinin asıl kanıtı.
+
+use std.math
+
+# --- Özel yetenek: Yıldırım Darbesi ---
+
+class YildirimDarbesi:
+    ad = "Yıldırım Darbesi"
+    manaMaliyeti: int = 40
+    bekleme: f64 = 8.0
+    menzil: f64 = 12.0
+
+    fn init(self):
+        self.sonKullanim = {}
+
+    fn kullanilabilir(self, oyuncu) -> bool:
+        son = self.sonKullanim[oyuncu.id] if oyuncu.id in self.sonKullanim else 0.0
+        return mc.zaman() - son >= self.bekleme
+
+    fn kullan(self, oyuncu):
+        if not self.kullanilabilir(oyuncu):
+            oyuncu.mesaj("§cYetenek hazır değil")
+            return
+
+        if oyuncu.mana < self.manaMaliyeti:
+            oyuncu.mesaj("§cYetersiz mana")
+            return
+
+        oyuncu.mana = oyuncu.mana - self.manaMaliyeti
+        self.sonKullanim[oyuncu.id] = mc.zaman()
+
+        hedefler = mc.yakindakiVarliklar(oyuncu.konum, self.menzil)
+        for h in hedefler:
+            if h.id == oyuncu.id:
+                continue
+            mc.yildirim(h.konum, false)          # false = hasarsız görsel
+            h.hasarVer(12.0 + oyuncu.seviye * 1.5)
+
+        mc.parcacik("electric_spark", oyuncu.konum, 60)
+        mc.ses(oyuncu.konum, "entity.lightning_bolt.thunder", 1.0)
+        oyuncu.mesaj(f"§b{self.ad} — {hedefler.len()} hedef")
+
+
+yetenek = YildirimDarbesi()
+
+# --- Event kancaları ---
+
+mc.on("oyuncuGirdi", (olay) => {
+    olay.oyuncu.mesaj("§6Raiden RPG'ye hoş geldin")
+    mc.veriYukle(olay.oyuncu)
+})
+
+mc.on("sagTik", (olay) => {
+    if olay.esya.tip == "BLAZE_ROD":
+        yetenek.kullan(olay.oyuncu)
+})
+
+mc.on("varlikOldu", (olay) => {
+    if olay.oldurenTip != "oyuncu":
+        return
+    oyuncu = olay.olduren
+    xp = 5 if olay.kurban.tip == "ZOMBIE" else 3
+    oyuncu.xp = oyuncu.xp + xp
+    if oyuncu.xp >= oyuncu.seviye * 100:
+        oyuncu.seviye = oyuncu.seviye + 1
+        oyuncu.xp = 0
+        oyuncu.mesaj(f"§aSeviye {oyuncu.seviye}!")
+        mc.yayin(f"§e{oyuncu.ad} seviye {oyuncu.seviye}'e ulaştı")
+})
+
+# --- Komut ---
+
+mc.komut("yetenekler", (gonderen, argumanlar) => {
+    gonderen.mesaj("§6--- Yetenekler ---")
+    gonderen.mesaj(f"§b{yetenek.ad} §7- {yetenek.manaMaliyeti} mana")
+})

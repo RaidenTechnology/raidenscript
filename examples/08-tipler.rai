@@ -1,0 +1,60 @@
+# Kademeli tipler ve nil-güvenliği — Faz 2'nin en değerli işi
+
+# --- Tip yazmadan başla ---
+x = 5                       # int olarak çıkarılır
+y = "merhaba"               # str
+
+# --- Kritik yerde tip ekle ---
+hp: int = 100
+ad: str = "Raiden"
+oran: f64 = 0.75
+
+# hp = "çok"                # ✗ TİP HATASI: int bekleniyordu, str verildi
+
+# --- Fonksiyon imzaları sözleşmedir ---
+fn hasarUygula(hedef: Varlik, miktar: int) -> int:
+    hedef.hp = hedef.hp - miktar
+    return hedef.hp
+
+# --- T? — nil olabilen değerler ---
+
+fn oyuncuBul(ad: str) -> Oyuncu?:            # nil DÖNEBİLİR
+    for o in sunucu.oyuncular():
+        if o.ad == ad:
+            return o
+    return nil
+
+o = oyuncuBul("raiden")
+
+# print(o.hp)               # ✗ HATA: 'o' nil olabilir, önce daralt
+
+if o != nil:
+    print(o.hp)             # ✓ daraltma (narrowing) sonrası güvenli
+
+# Erken çıkışla daraltma da çalışır
+fn selamla(ad: str):
+    o = oyuncuBul(ad)
+    if o == nil:
+        return
+    print(f"merhaba {o.ad}")     # ✓ buraya nil gelemez, derleyici biliyor
+
+
+# --- ?. güvenli erişim ---
+uzunluk = o?.ad                  # o nil ise sonuç nil, patlamaz
+
+# --- any bulaşıcı değildir ---
+fn hamVeri() -> any:
+    return json.parse(sys.oku("veri.json"))
+
+veri = hamVeri()
+sayi: int = veri["hp"]           # çalışma zamanı kontrolü eklenir, tip güvenliği korunur
+
+# --- Tipli koleksiyonlar ---
+skorlar: list[int] = [10, 20, 30]
+# skorlar.push("otuz")           # ✗ HATA: list[int]'e str eklenemez
+
+sozluk: map[str, Oyuncu] = {}
+
+# --- Fonksiyon tipi ---
+geriCagirma: fn(int) -> bool = (n) => n > 10
+print(geriCagirma(42))

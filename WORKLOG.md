@@ -93,3 +93,50 @@ veya kayda değer proje olmadığı doğrulandı.
   modül önbelleği `~/.raidenscript/pkg/`, örnek paket `rs-http`, `rs run dosya.rai`
 - `README.md` yeniden yazıldı (adlandırma bölümü eklendi)
 - Proje klasörü `rai/` → `raidenscript/`
+
+---
+
+## 26 Temmuz 2026 — 7 kusur çözüldü, örnekler 10/30
+
+**Dönüm noktası:** Faz 0'ın ilk bulgu turu kapandı, gramer güncellendi.
+
+### Çözülen 7 kusur ve spec'e işlenişi
+
+| # | Karar | Nereye |
+|---|---|---|
+| 1 | `a if kosul else b` eklendi — öncelik 0, sağ birleşmeli | §2, §8, §9 |
+| 2 | `=> { ... }` girinti kuralına resmi istisna | §2, §9 lexer kuralı 2 |
+| 3 | Bildirilmemiş alan serbest ama **uyarı** üretir, tipi `any` | §4 |
+| 4 | `/` her zaman float, `//` tam bölme | §2 |
+| 5 | Prelude sabitlendi (dar); matematik `use std.math` ister | §7.2 |
+| 6 | f-string `{...}` alt-lexer'la yeniden taranır | §9 lexer kuralı 3 |
+| 7 | `Error` prelude'da sınıf, kalıtılabilir | §7.2 |
+
+Ayrıca **§9'a sözcüksel katman kuralları** eklendi (3 istisna: parantez derinliği
+girintiyi bastırır, brace_block'ta INDENT/DEDENT yok, f-string alt-lexer'ı).
+
+### Yeni örnekler (10/30)
+
+- `08-tipler` — kademeli tip, `T?` nil-güvenliği, daraltma, `?.`, `any` sınırı
+- `09-kosullu-ve-lambda` — yeni eklenen iki gramer yapısının egzersizi
+- `10-minecraft-plugin` — **ikinci host bağlayıcısı** (`mc.*`, JVM köprüsü)
+
+`10` özellikle önemli: aynı dilin hem tarayıcı oyununa (`06`) hem Minecraft
+sunucusuna girebildiğini gösteriyor. Gömme tezinin asıl kanıtı bu — dil çekirdeği
+hiç değişmedi, sadece bağlayıcı farklı.
+
+### Yeni bulgu (#8)
+
+`09`'u yazarken `(olay) => olay.hedef.y = ...` yazdım — **atama bir ifade değil.**
+Karar: öyle kalsın (`if (x = 5)` hatasının kapısını açmamak için). Süslü parantezli
+gövde bu durumun da çözümü — kural 2'nin ikinci gerekçesi.
+
+### Düzeltme
+
+`02-fonksiyonlar` çıplak `sqrt()` kullanıyordu; prelude kararı gereği
+`use std.math` + `math.sqrt()` oldu.
+
+### Sırada
+
+- Örnekler 30'a — özellikle async, string işleme, algoritma, İHA telemetrisi
+- Sonra **Faz 1**: lexer → Pratt parser → AST → resolver → tree-walking yorumlayıcı

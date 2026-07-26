@@ -1,0 +1,65 @@
+# Koşullu ifade ve çok satırlı lambda — gramere sonradan eklenen iki yapı
+
+use std.math
+
+# --- Koşullu ifade (ternary) ---
+# Sözdizimi: <deger> if <kosul> else <deger>
+
+hp = 35
+durum = "kritik" if hp < 40 else "iyi"
+print(durum)
+
+enBuyuk = (a, b) => a if a > b else b
+print(enBuyuk(17, 9))
+
+# Zincirlenebilir (sağ birleşmeli)
+kademe = "efsane" if hp > 90 else "iyi" if hp > 50 else "zayıf"
+print(kademe)
+
+# Ok fonksiyonunun içinde asıl işe yarıyor
+sayilar = [4, 17, 2, 99, 31]
+isaretli = sayilar.map((n) => "büyük" if n > 20 else "küçük")
+print(isaretli)
+
+
+# --- Çok satırlı lambda: () => { ... } ---
+# Girinti kuralına RESMİ İSTİSNA. Fonksiyon çağrısının parantezi içinde
+# çok satırlı gövde ancak böyle yazılabilir.
+
+olaylar = []
+
+fn kaydet(ad: str, isleyici):
+    olaylar.push({"ad": ad, "fn": isleyici})
+
+kaydet("vurulma", (olay) => {
+    hasar = olay.hasar
+    if olay.kritik:
+        hasar = hasar * 2
+    olay.hedef.hp = olay.hedef.hp - hasar
+    print(f"{hasar} hasar")
+})
+
+kaydet("iyilesme", (olay) => {
+    yeni = olay.hedef.hp + olay.miktar
+    olay.hedef.hp = 100 if yeni > 100 else yeni
+})
+
+# Tek ifadelik gövdede süslü parantez gereksiz
+kaydet("hesapla", (olay) => olay.hasar * 2)
+
+# ⚠ AMA: atama bir İFADE değil, DEYİMdir.
+# kaydet("zipla", (olay) => olay.hedef.y = olay.hedef.y - 50)   ✗ geçersiz
+# Atama yapacaksan süslü parantez şart:
+kaydet("zipla", (olay) => { olay.hedef.y = olay.hedef.y - 50 })
+
+
+# --- İkisi birlikte ---
+fn siniflandir(liste: list[int]) -> map[str, list[int]]:
+    sonuc = {"cift": [], "tek": []}
+    liste.forEach((n) => {
+        anahtar = "cift" if n % 2 == 0 else "tek"
+        sonuc[anahtar].push(n)
+    })
+    return sonuc
+
+print(siniflandir([1, 2, 3, 4, 5, 6]))

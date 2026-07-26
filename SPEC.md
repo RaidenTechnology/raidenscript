@@ -66,6 +66,9 @@ Bu tablo dilin karakterini belirler. Her satırın bir gerekçesi var; gerekçe 
 | Sayılar | `int` (64-bit işaretli) ve `float` (f64) | İki tip yeter. `i8..u64`, `f32` sonraki fazlarda tipli alanlar için |
 | String | `str`, UTF-8, **değişmez** | Değişmezlik eşzamanlılık ve hash'lenebilirlik için bedava kazanç |
 | Aralık | `0..10` (hariç), `0..=10` (dahil) | Rust'ın açıklığı; Python'un `range()` fonksiyon çağrısından daha okunur |
+| Bölme | `/` **her zaman float**, `//` tam bölme | `5 / 2 == 2.5`. Sessiz tam sayı kırpması sinsi hata kaynağı — C'nin bu davranışı reddedildi |
+| Koşullu ifade | `a if kosul else b` | Yeni anahtar kelime gerekmiyor. Ok fonksiyonlarının içinde tek satırlık dallanma şart |
+| Çok satırlı lambda | `() => { ... }` süslü parantez | Girinti kuralına **resmi istisna**. Python lambda'yı tek ifadeye hapsettiği için bu kalıbı yazamaz; gömme API'sinin en sık deseni tam olarak bu |
 | Modüller | `use "github.com/kullanici/repo"` | Go modeli — registry yok, sunucu yok, hesap yok, domain yok |
 | Yorum | `#` satır sonuna kadar | Python |
 | Dosya uzantısı | `.rai` | "Rai"den + 雷 kökü. Çakışan canlı format yok. `.rs`/`.rds`/`.rsc`/`.ra` alınamaz — yukarıdaki nota bak |
@@ -321,6 +324,22 @@ if o != nil:
 
 Bu tek kural, gerçek yazılımdaki hataların büyük bir dilimini kapatır — ve Faz 2'nin en değerli işi budur.
 
+### Sınıf alanları
+
+`class` gövdesinde bildirilen alanlar tiplidir ve denetlenir. `init` içinde
+bildirilmeden yaratılan alanlar serbesttir ama **`any` tipini alır ve uyarı üretir**:
+
+```python
+class Gemi:
+    hp: int = 100          # bildirilmiş → tipli, denetlenir
+
+    fn init(self, ad):
+        self.ad = ad       # ⚠ uyarı: bildirilmemiş alan 'ad', tipi any
+```
+
+Yasaklamak Python'dan gelen birine fazla katı gelir; sessizce kabul etmek tip
+denetleyicisini kör eder. Uyarı ikisinin ortası: çalışır, ama sana söyler.
+
 ---
 
 ## 5. Bellek modeli
@@ -358,7 +377,9 @@ Host bağlayıcıları (dil çekirdeğinin dışında, her proje için ayrı):
 
 ---
 
-## 7. Anahtar kelimeler
+## 7. Anahtar kelimeler ve prelude
+
+### 7.1 Anahtar kelimeler
 
 Toplam **28**. Bu sayı v1.0'a kadar 30'u geçmeyecek.
 
@@ -371,6 +392,27 @@ await   self    super   true    false   nil     pass
 
 Operatör olarak da: `and` `or` `not` `is`
 
+### 7.2 Prelude — `use` gerektirmeden hazır isimler
+
+Kasıtlı olarak **dar**. Bu listeye girmeyen her şey `use std.*` ister.
+Prelude büyüdükçe isim çakışması riski artar ve dilin "küçük çekirdek" sözü çürür.
+
+```
+print(...)          çıktı
+len(x)              uzunluk
+type(x)             tip adı (str)
+int(x) float(x)     dönüşüm
+str(x) bool(x)      dönüşüm
+range(a, b [, adim]) aralık nesnesi (0..b kısayolunun fonksiyon hali)
+assert(kosul, mesaj) doğrulama
+Error               yerleşik hata SINIFI — kalıtılabilir, `message` alanı var
+```
+
+`Error` bir sınıf olduğu için `class YetersizKredi(Error)` yazılabilir; tüm
+`throw` edilen değerler `Error`'dan türemek zorundadır.
+
+Matematik prelude'da **değildir** — `use std.math` ister. `sqrt()` çıplak yazılamaz.
+
 ---
 
 ## 8. Operatör öncelikleri
@@ -379,6 +421,7 @@ Pratt parser bu tabloyu birebir uygular. Düşükten yükseğe:
 
 | Öncelik | Operatörler | Birleşme |
 |---|---|---|
+| 0 | `a if kosul else b` (koşullu ifade) | sağ |
 | 1 | `or` | sol |
 | 2 | `and` | sol |
 | 3 | `not` (tekli) | sağ |
@@ -394,7 +437,20 @@ Pratt parser bu tabloyu birebir uygular. Düşükten yükseğe:
 
 ## 9. Gramer (EBNF)
 
-Sözcüksel katman `INDENT` / `DEDENT` / `NEWLINE` token'ları üretir (Python modeli).
+### Sözcüksel katman kuralları
+
+Lexer `INDENT` / `DEDENT` / `NEWLINE` token'ları üretir (Python modeli), ama üç istisnayla:
+
+1. **Parantez derinliği girintiyi bastırır.** `(`, `[`, `{` içindeyken `NEWLINE`,
+   `INDENT` ve `DEDENT` üretilmez — ifade satırlara serbestçe yayılır.
+2. **`brace_block` içinde `INDENT`/`DEDENT` yok.** Deyimler `NEWLINE` veya `;` ile
+   ayrılır. Bu, `() => { ... }` kalıbının bir fonksiyon çağrısının parantezi içinde
+   yazılabilmesini sağlar — girintiyle çözülemeyecek tek durum budur.
+3. **f-string'in `{...}` bölümü alt-lexer'la yeniden taranır.** İçeride tam bir ifade
+   vardır ve dış string'in tırnağı iç ifadeyi bağlamaz:
+   `f"kredi: {oyuncu["kredi"]}"` geçerlidir.
+
+Ayrıca: `#` satır sonuna kadar yorumdur ve string içinde özel anlamı yoktur.
 
 ```ebnf
 program        = { statement } EOF ;
@@ -442,7 +498,8 @@ element        = "<" IDENT { attr } ( "/>" | ">" { element | text | "{" expr "}"
 attr           = IDENT [ "=" ( STRING | NUMBER | "{" expr "}" ) ] ;
 
 (* ifadeler — öncelik tablosuna göre *)
-expr           = or_expr ;
+expr           = ternary ;
+ternary        = or_expr [ "if" or_expr "else" ternary ] ;    (* sağ birleşmeli *)
 or_expr        = and_expr { "or" and_expr } ;
 and_expr       = not_expr { "and" not_expr } ;
 not_expr       = "not" not_expr | compare ;
@@ -460,7 +517,8 @@ primary        = NUMBER | STRING | FSTRING | "true" | "false" | "nil"
                | "[" [ expr { "," expr } ] "]"
                | "{" [ map_entry { "," map_entry } ] "}"
                | lambda ;
-lambda         = "(" [ params ] ")" "=>" ( expr | block ) ;
+lambda         = "(" [ params ] ")" "=>" ( expr | brace_block ) ;
+brace_block    = "{" { simple_stmt ( NEWLINE | ";" ) | compound_stmt } "}" ;
 map_entry      = expr ":" expr ;
 
 type           = IDENT [ "[" type { "," type } "]" ] [ "?" ]
@@ -506,9 +564,23 @@ type           = IDENT [ "[" type { "," type } "]" ] [ "?" ]
 
 ## 11. Açık sorular
 
-### 11a. Örnek yazarken ORTAYA ÇIKAN kusurlar (26 Tem, `examples/01-07`)
+### 11a. Örnek yazarken ortaya çıkan kusurlar — ✅ HEPSİ ÇÖZÜLDÜ (26 Tem)
 
-Bunlar spec'i okurken değil, dili *kullanırken* çıktı. Faz 1 başlamadan karara bağlanmalı.
+Bunlar spec'i okurken değil, dili *kullanırken* çıktı — Faz 0'ın tüm varlık sebebi bu.
+Yedisi de karara bağlandı ve spec'e/gramere işlendi. Aşağıdaki kayıt kararın *neden*
+öyle verildiğini korumak için duruyor; bir daha tartışılmasın.
+
+| # | Kusur | Karar | İşlendiği yer |
+|---|---|---|---|
+| 1 | Koşullu ifade (ternary) gramerde yoktu | `a if kosul else b`, öncelik 0, sağ birleşmeli | §2, §8, §9 |
+| 2 | Çok satırlı ok fonksiyonu tanımsızdı | `=> { ... }` girinti kuralına resmi istisna | §2, §9 lexer kuralı 2 |
+| 3 | `init` içinde bildirilmemiş alan | Serbest ama uyarı verilir; bildirilen tipli, bildirilmeyen `any` | §4 |
+| 4 | `/` tam sayılarda ne döndürür | Her zaman float; `//` tam bölme | §2 |
+| 5 | Prelude tanımsızdı | Dar liste sabitlendi; matematik `use std.math` ister | §7.2 |
+| 6 | f-string içinde tırnak çakışması | `{...}` alt-lexer'la yeniden taranır, iç tırnak serbest | §9 lexer kuralı 3 |
+| 7 | `Error` gerçek sınıf olmalı | Prelude'da sınıf, kalıtılabilir, `message` alanlı | §7.2 |
+
+Kararların ayrıntılı gerekçeleri (arşiv):
 
 1. **🔴 Koşullu ifade (ternary) gramerde YOK.** `04-koleksiyonlar.rai`'de refleksle `a if a > b else b` yazdım — ayrıştırılamaz. Karar gerek: ya `expr if expr else expr` eklenir (Python biçimi, yeni anahtar kelime gerekmez, `if`/`else` zaten var) ya da yasaklanıp `math.max()` gibi fonksiyonlara zorlanır. **Öneri: eklensin** — ok fonksiyonlarının içinde tek satırlık dallanma sık lazım oluyor ve alternatifi çirkin.
 
@@ -523,6 +595,16 @@ Bunlar spec'i okurken değil, dili *kullanırken* çıktı. Faz 1 başlamadan ka
 6. **🟡 f-string içinde tırnak çakışması.** `04`'te `f"kredi: {oyuncu['kredi']}"` yazdım. Lexer, f-string'in `{...}` bölümünü ayrı bir alt-lexer'la mı tarayacak? **Öneri: evet** — `{}` içi tam ifade olarak yeniden taranır, iç tırnak serbest.
 
 7. **🟡 Yerleşik `Error` gerçek bir sınıf olmalı.** `05`'te `class YetersizKredi(Error)` yazdım. Yani `Error` prelude'da bir sınıf ve kalıtılabilir; `message` alanı var.
+
+### 11a-2. İkinci turda çıkan kusur (26 Tem, `examples/08-10`)
+
+8. **✅ Atama bir ifade DEĞİL, deyimdir.** `09`'u yazarken refleksle
+   `(olay) => olay.hedef.y = olay.hedef.y - 50` yazdım — geçersiz, çünkü `assign`
+   gramerde `simple_stmt` altında, `expr` altında değil.
+   **Karar: öyle kalsın.** Atamayı ifade yapmak `if (x = 5)` klasik hatasının kapısını
+   açar. Tek satırlık lambda'da atama gerekiyorsa süslü parantez kullanılır:
+   `(olay) => { olay.hedef.y = ... }`. Bu, kural 2'nin (brace_block) neden gerekli
+   olduğunun ikinci kanıtı.
 
 ### 11b. Baştan bilinen açık sorular
 
