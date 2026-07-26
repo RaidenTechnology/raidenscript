@@ -200,3 +200,50 @@ sebebi tam olarak bu.
 ```
 
 **İlk dönüm noktası:** `rs run examples/01-temeller.rai` çalışsın.
+
+---
+
+## 26 Temmuz 2026 — Faz 1 / adım 1: iskelet + tanılama motoru
+
+**Dönüm noktası:** İlk C++ kodu. `rs.exe` derlenip çalışıyor.
+
+### Araç zinciri kuruldu
+
+Makinede hiçbir C++ derleyicisi yoktu (cmake/g++/clang/MSVC/WinSDK — hepsi yok).
+**w64devkit v2.8.0** kuruldu: `C:\Users\imrai\tools\w64devkit`
+(tek 7z-SFX, 57.3 MB, kurulum yok, yönetici yetkisi yok, hesap yok).
+
+```
+gcc/g++ 16.1.0   make 4.4.1   gdb 17.1   __cplusplus = 202002
+```
+
+⚠️ **Tuzak:** `w64devkit\bin` PATH'te olmazsa g++ kendi assembler'ını (`as`)
+bulamaz ve "cannot execute 'as'" der. Sistem PATH'i kirletmemek için
+`build.ps1` araç zincirini kendisi bulup PATH'i sadece o oturum için ayarlıyor.
+
+### Yazılanlar
+
+| Dosya | İş |
+|---|---|
+| `Makefile` | `make` / `make run FILE=…` / `make test` / `make clean`, `DEBUG=1` ile sanitizer |
+| `build.ps1` | Windows sarmalayıcı; w64devkit'i kendisi bulur, sistem PATH'ine dokunmaz |
+| `src/source.hpp/.cpp` | `Span` (bayt ofseti) + `Source` (satır indeksi, UTF-8 farkındalıklı satır/sütun) |
+| `src/diag.hpp/.cpp` | Rust tarzı tanılama: `hata: …`, `--> dosya:satır:sütun`, kaynak satırı, ok işareti, ipucu |
+| `src/main.cpp` | CLI: `run` / `tani` / `--version` / `--help` / REPL iskeleti |
+
+**Neden önce tanılama motoru?** SPEC §1 hedef 4: "hata mesajları birinci sınıf
+vatandaş". Sonradan eklenen hata altyapısı hep yamalı kalır — lexer'dan bile önce
+yazıldı ki bundan sonraki her modül ilk günden düzgün hata versin.
+
+### Doğrulama
+
+- `-Wall -Wextra -Wpedantic -Wshadow -Wconversion` ile **sıfır uyarı**
+- `rs --version`, `rs run <dosya>` çalışıyor
+- **UTF-8 sütun testi geçti:** `öğüşçı = 1   # fn burada` satırında ok işareti
+  sütun **16**'ya (doğru) düştü; bayt ofseti kullanılsaydı 22 olup 6 karakter
+  kayacaktı. Türkçe kaynakta hata mesajları hizalı.
+
+### Sırada
+
+Faz 1 / adım 2: **lexer** — token tipleri, INDENT/DEDENT üretimi, f-string
+alt-lexer'ı, `brace_block` modu, `=>` sonrası `{` ayrımı (SPEC §9 lexer kuralları).
