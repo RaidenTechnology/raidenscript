@@ -15,10 +15,76 @@
 [x] 4  parser                   15/15 örnek ayrışıyor
 [x] 5  resolver                 15/15 temiz, 1.044 isim çözüldü
 [x] 6  yorumlayıcı              ✅ rs run ÇALIŞIYOR — 10/10 örnek
-[ ] 7  REPL              ← SIRADAKİ İŞ (küçük)
+[x] 7  REPL                     ✅ KULLANICI YAZDI
 ```
 
-🎉 **`rs run examples/01-temeller.rai` çalışıyor.** Faz 1'in hedefi tutturuldu.
+# 🎉 FAZ 1 TAMAMLANDI
+
+`rs run` ve `rs` (REPL) çalışıyor. Dil ayakta.
+
+---
+
+## 26 Temmuz 2026 — Faz 1 / adım 7: REPL (kullanıcının kendi kodu)
+
+**Bu adımın kodunu kullanıcı yazdı** — Claude tasarımı verdi, kullanıcı `repl.hpp`,
+`repl.cpp`, `interp.hpp`'deki `setDiagnostics` ve `main.cpp` bağlantısını kendi
+editöründe yazdı. Hackatime saati bu turdan itibaren işliyor.
+
+### Kritik tasarım noktası (ve neden işe yaradığı)
+
+REPL her turun `Source`/`Diagnostics`/`Program` nesnelerini vektörlerde **yaşatıyor**.
+Sebebi: 1. turda tanımlanan bir fonksiyon (`FnObj`) gövdesine `const Stmt*` işaretçisi
+tutuyor — o AST silinseydi 2. turda çağırmak çökerdi.
+
+Kabul testi bunu doğruladı:
+```
+>>> fn kare(x):
+...     return x * x
+...
+>>> kare(kare(3))
+81
+```
+`kare` 3. turda tanımlandı, 5. turda iç içe çağrıldı. Çalışıyor.
+
+### 🐛 REPL'in ortaya çıkardığı gerçek kusur
+
+İlk testte `1 + 2 * 3` **hata verdi**: `tanımsız ad: '﻿1'`. Sebep **BOM**.
+
+`Source::fromFile` BOM'u kırpıyordu ama **kurucu kırpmıyordu**. REPL
+`Source("<repl>", metin)` diye doğrudan kurucuyu çağırdığı için boru ile gelen
+girdideki BOM içeri sızıyordu. Terminalde elle yazarken görünmez, ama
+`rs < betik.rai` ya da betikten besleme yaparken patlıyordu.
+
+**Düzeltme:** BOM kırpma `fromFile`'dan alınıp **kurucuya** taşındı. Artık her iki
+yol da (dosya ve bellek içi metin) tek yerden kapsanıyor.
+
+### Kabul testleri — 7/7
+
+| Test | Sonuç |
+|---|---|
+| `1 + 2 * 3` | `7` — ifade değeri yazdırılıyor (BOM'lu boruda bile) |
+| `ad = "Raiden"` → `f"merhaba {ad}"` | `"merhaba Raiden"` — ortam turlar arası yaşıyor |
+| `fn kare(x)` → `kare(kare(3))` | `81` — AST ömrü doğru |
+| `1 / 0` → `2 + 2` | hata basıldı, REPL ölmedi, `4` verdi |
+| `[1,2,3].map((x) => x * 10)` | `[10, 20, 30]` |
+| `.cik` | temiz çıkış |
+
+### Regresyon
+
+10/10 çalışabilir örnek hâlâ geçiyor, 0 gerçek hata.
+
+---
+
+## Sırada: yayın turu
+
+1. README'yi İngilizceye çevir (uluslararası hedef)
+2. `v0.1` etiketi
+3. GitHub'a push → `github.com/RaidenTechnology/raidenscript`
+4. Stardance projesi (Hackatime projesi: **`raidenscript`**) + devlog + ship
+
+Sonra **minimal Faz 4**: C API + WASM + `game.*` bağlayıcısı → STAR BREAKER'da
+RaidenScript ile tanımlanmış tek bir silah. Faz 2 (tipler) ve Faz 3 (bytecode VM)
+atlanıyor — tree-walk yorumlayıcı mod betikleri için fazlasıyla hızlı.
 
 **Derleme:** `powershell -File build.ps1` (w64devkit'i kendi bulur)
 **Sınama:** `build\rs.exe ast examples\12-algoritmalar.rai`

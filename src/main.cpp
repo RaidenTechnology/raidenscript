@@ -22,6 +22,7 @@
 #include "resolver.hpp"
 #include "source.hpp"
 #include "token.hpp"
+#include "repl.hpp" 
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -244,9 +245,8 @@ int komutTani(const std::string& yol) {
 }
 
 int komutRepl() {
-    std::cout << "RaidenScript " << SURUM << " REPL\n"
-              << "Yorumlayıcı henüz yok (Faz 1 / adım 6). Çıkış: Ctrl+C\n";
-    return 0;
+    rs::Repl repl;
+    return repl.run();
 }
 
 }  // namespace

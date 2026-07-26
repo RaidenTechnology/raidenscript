@@ -41,6 +41,8 @@ public:
 
     // REPL için: tek bir deyimi çalıştırıp son ifade değerini döndürür.
     [[nodiscard]] Value lastValue() const { return son_; }
+        // REPL her tur icin yeni bir Diagnostics kullaniyor.
+    void setDiagnostics(Diagnostics& d) { diag_ = &d; }
 
 private:
     // --- çekirdek ---
