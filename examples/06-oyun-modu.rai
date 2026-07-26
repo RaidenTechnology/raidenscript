@@ -1,0 +1,67 @@
+# STAR BREAKER modu — dilin asıl varlık sebebi.
+# 'game.*' host tarafından sağlanır, dilin parçası DEĞİLDİR.
+# Dil çekirdeği küçük kalır; güç bağlayıcıdan gelir.
+
+use std.math
+
+# --- Yeni silah tanımı ---
+
+class PlazmaTopu:
+    ad = "PLASMA LANCE"
+    hasar: int = 85
+    atisHizi: f64 = 0.4
+    nadirlik = "unique"
+
+    fn init(self):
+        self.sonAtis = 0.0
+
+    fn ates(self, gemi, hedefX: f64, hedefY: f64):
+        simdi = game.zaman()
+        if simdi - self.sonAtis < self.atisHizi:
+            return
+
+        self.sonAtis = simdi
+        aci = math.atan2(hedefY - gemi.y, hedefX - gemi.x)
+
+        mermi = game.mermiOlustur(gemi.x, gemi.y, aci, 900.0)
+        mermi.hasar = self.hasar
+        mermi.renk = "#40e0d0"
+        mermi.delici = true
+
+        game.ses("plasma_fire", 0.6)
+        game.sarsinti(3.0, 0.12)
+
+
+# --- Event kancaları ---
+
+silah = PlazmaTopu()
+
+game.on("hazir", () => {
+    game.kayitEt("weapon", silah)
+    print(f"{silah.ad} yüklendi")
+})
+
+game.on("atesEmri", (olay) => {
+    silah.ates(olay.gemi, olay.hedefX, olay.hedefY)
+})
+
+game.on("dusmanOldu", (olay) => {
+    if olay.tip == "boss":
+        game.krediVer(500)
+        game.sandikDusur(olay.x, olay.y, "legendary")
+})
+
+
+# --- Kendi kat olayın ---
+
+fn plazmaFirtinasi(kat: int):
+    sayi = 6 + kat * 2
+    for i in 0..sayi:
+        aci = (i / sayi) * math.PI * 2.0
+        x = 480.0 + math.cos(aci) * 300.0
+        y = 270.0 + math.sin(aci) * 300.0
+        game.goktasiOlustur(x, y, "volatile")
+
+    game.bildirim("PLASMA STORM", "#40e0d0")
+
+game.katOlayiEkle("plasma_storm", 0.15, plazmaFirtinasi)

@@ -1,0 +1,46 @@
+# Listeler, haritalar, dilimleme
+
+# --- Liste ---
+envanter = ["pistol", "smg", "shotgun"]
+envanter.push("railgun")
+
+print(envanter[0])          # pistol
+print(envanter[-1])         # railgun — negatif indeks sondan
+print(envanter[1..3])       # ["smg", "shotgun"] — dilim, üst sınır hariç
+print(envanter.len())
+
+for silah in envanter:
+    print(f"- {silah}")
+
+# --- Harita ---
+oyuncu = {
+    "ad": "Raiden",
+    "hp": 100,
+    "kredi": 2500,
+}
+
+oyuncu["mp"] = 50
+print(oyuncu["ad"])
+
+if "kredi" in oyuncu:
+    print(f"kredi: {oyuncu['kredi']}")
+
+for anahtar, deger in oyuncu.items():
+    print(f"{anahtar} = {deger}")
+
+# --- Tipli koleksiyonlar ---
+skorlar: list[int] = [420, 1337, 99]
+fiyatlar: map[str, int] = {"pistol": 5000, "railgun": 20000}
+
+enYuksek = skorlar.reduce((a, b) => a if a > b else b, 0)
+print(f"en yüksek skor: {enYuksek}")
+
+# --- İç içe yapı ---
+kayit = {
+    "gemi": "Falcon",
+    "silahlar": ["railgun", "smg"],
+    "yetenekler": {"hyper": 3, "explosive": 2},
+}
+
+print(kayit["silahlar"][0])
+print(kayit["yetenekler"]["hyper"])

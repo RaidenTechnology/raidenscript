@@ -1,0 +1,53 @@
+# Fonksiyonlar, kapanışlar, özyineleme
+
+fn selamla(ad):
+    return f"Merhaba {ad}"
+
+fn vur(hedef, hasar = 10):                 # varsayılan parametre
+    hedef.hp = hedef.hp - hasar
+    return hedef.hp
+
+fn mesafe(ax: f64, ay: f64, bx: f64, by: f64) -> f64:
+    dx = ax - bx
+    dy = ay - by
+    return sqrt(dx*dx + dy*dy)
+
+# Özyineleme
+fn faktoriyel(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * faktoriyel(n - 1)
+
+print(faktoriyel(10))
+
+# Ok fonksiyonları
+kare = (x) => x * x
+topla = (a, b) => a + b
+print(kare(7))
+print(topla(3, 4))
+
+# Kapanış — dış kapsama YAZMAK için 'outer' şart
+fn sayacYap():
+    n = 0
+    return () => {
+        outer n = n + 1
+        return n
+    }
+
+say = sayacYap()
+print(say())        # 1
+print(say())        # 2
+print(say())        # 3
+
+# Fonksiyon değer olarak taşınır
+fn uygula(f, deger):
+    return f(deger)
+
+print(uygula(kare, 9))
+
+# Yüksek mertebeli
+sayilar = [1, 2, 3, 4, 5]
+ciftler = sayilar.filter((x) => x % 2 == 0)
+kareler = sayilar.map((x) => x * x)
+toplam  = sayilar.reduce((a, b) => a + b, 0)
+print(f"{ciftler} {kareler} {toplam}")

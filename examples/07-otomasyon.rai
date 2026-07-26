@@ -1,0 +1,70 @@
+# RaidenAI / Crimson otomasyon betiği.
+# 'sys.*' host bağlayıcısı — dosya, süreç, ağ.
+
+use std.json
+use std.math
+
+# --- Proje klasöründeki tüm .rai dosyalarının satır sayısını çıkar ---
+
+fn satirSay(yol: str) -> int:
+    icerik = sys.oku(yol)
+    return icerik.split("\n").len()
+
+fn raporla(klasor: str):
+    dosyalar = sys.listele(klasor, "*.rai")
+    toplam = 0
+    rapor = {}
+
+    for dosya in dosyalar:
+        n = satirSay(dosya)
+        rapor[dosya] = n
+        toplam = toplam + n
+
+    print(f"{dosyalar.len()} dosya, {toplam} satır")
+
+    for ad, n in rapor.items():
+        pay = (n * 100) / toplam
+        print(f"  {ad}: {n} satır (%{pay})")
+
+    return toplam
+
+
+# --- Yedekleme ---
+
+fn yedekle(kaynak: str, hedef: str):
+    if not sys.varMi(kaynak):
+        throw Error(f"kaynak bulunamadı: {kaynak}")
+
+    damga = sys.tarih("YYYYMMDD-HHmm")
+    cikti = f"{hedef}/yedek-{damga}.zip"
+
+    sys.zip(kaynak, cikti)
+    print(f"yedeklendi: {cikti}")
+    return cikti
+
+
+# --- Build + test zinciri ---
+
+fn buildVeTest(proje: str) -> bool:
+    sonuc = sys.calistir("npm", ["run", "build"], proje)
+
+    if sonuc.kod != 0:
+        print("BUILD BAŞARISIZ")
+        print(sonuc.hata)
+        return false
+
+    test = sys.calistir("npm", ["test"], proje)
+    if test.kod != 0:
+        print("TESTLER GEÇMEDİ")
+        return false
+
+    print("build + test temiz")
+    return true
+
+
+# --- Kullanım ---
+
+toplam = raporla("C:/Users/imrai/Documents/RaidenTechnology/rai/examples")
+
+if buildVeTest("C:/Users/imrai/Documents/RaidenAI"):
+    yedekle("C:/Users/imrai/Documents/RaidenAI", "D:/yedek")

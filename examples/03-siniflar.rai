@@ -1,0 +1,63 @@
+# Sınıflar, kalıtım, trait'ler
+
+trait Cizilebilir:
+    fn ciz(self, yzc)
+
+trait Guncellenebilir:
+    fn guncelle(self, dt: f64)
+
+class Varlik:
+    hp: int = 100
+    x: f64 = 0.0
+    y: f64 = 0.0
+
+    fn init(self, x, y):
+        self.x = x
+        self.y = y
+
+    fn hasarAl(self, miktar: int):
+        self.hp = self.hp - miktar
+        if self.hp <= 0:
+            self.oldu()
+
+    fn oldu(self):
+        print("varlık yok oldu")
+
+    fn yasiyor(self) -> bool:
+        return self.hp > 0
+
+
+class Gemi(Varlik, Cizilebilir, Guncellenebilir):
+    kredi: int = 0
+    hiz: f64 = 220.0
+
+    fn init(self, x, y, ad):
+        super.init(x, y)
+        self.ad = ad
+
+    fn ciz(self, yzc):
+        yzc.sprite("ship", self.x, self.y)
+
+    fn guncelle(self, dt: f64):
+        self.x = self.x + self.hiz * dt
+
+    fn oldu(self):                          # geçersiz kılma
+        print(f"{self.ad} patladı")
+
+    fn kazan(self, miktar: int):
+        self.kredi = self.kredi + miktar
+        return self.kredi
+
+
+g = Gemi(100.0, 200.0, "Falcon")
+g.kazan(500)
+print(f"{g.ad}: {g.kredi} CR, can {g.hp}")
+
+g.hasarAl(60)
+print(f"yaşıyor mu: {g.yasiyor()}")
+g.hasarAl(60)                                # -> "Falcon patladı"
+
+# Trait'e göre çalışan fonksiyon — somut sınıfı bilmiyor
+fn hepsiniCiz(varliklar: list[Cizilebilir], yzc):
+    for v in varliklar:
+        v.ciz(yzc)

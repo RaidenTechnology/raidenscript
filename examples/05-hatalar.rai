@@ -1,0 +1,41 @@
+# Hata yönetimi
+
+fn bol(a: f64, b: f64) -> f64:
+    if b == 0.0:
+        throw Error("sıfıra bölme denemesi")
+    return a / b
+
+try:
+    sonuc = bol(10.0, 0.0)
+    print(sonuc)
+catch e:
+    print(f"hata: {e.message}")
+finally:
+    print("bu her durumda çalışır")
+
+
+# Kendi hata tipin
+class YetersizKredi(Error):
+    fn init(self, gerekli: int, mevcut: int):
+        super.init(f"{gerekli} CR gerekli, {mevcut} CR var")
+        self.eksik = gerekli - mevcut
+
+fn satinAl(oyuncu, fiyat: int):
+    if oyuncu.kredi < fiyat:
+        throw YetersizKredi(fiyat, oyuncu.kredi)
+    oyuncu.kredi = oyuncu.kredi - fiyat
+    return true
+
+oyuncu = {"kredi": 300}
+
+try:
+    satinAl(oyuncu, 5000)
+catch e:
+    print(f"satın alınamadı: {e.message}")
+    print(f"{e.eksik} CR daha lazım")
+
+
+# Gömme kuralı: bir modun hatası host'u DÜŞÜRMEZ.
+# Host sınırı her çağrıyı sarmalar, hata log'a düşer, uygulama yaşamaya devam eder.
+fn riskliMod():
+    throw Error("mod çöktü")

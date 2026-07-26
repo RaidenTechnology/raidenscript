@@ -1,0 +1,43 @@
+# Temeller — değişkenler, tipler, akış kontrolü
+
+ad = "Raiden"
+hp: int = 100
+oran = 0.75
+acik = true
+bos = nil
+
+print(f"{ad} sahaya indi, can: {hp}")
+
+# Doğruluk kuralı: SADECE nil ve false yanlıştır.
+# 0 ve "" DOĞRUdur — Python/JS'teki klasik hatayı bu şekilde siliyoruz.
+sayac = 0
+if sayac:
+    print("buraya girer — çünkü 0 doğrudur")
+
+if bos:
+    print("buraya GİRMEZ")
+
+# Karşılaştırma ve mantık
+if hp > 50 and not bos:
+    print("durum iyi")
+elif hp > 20 or acik:
+    print("dikkatli ol")
+else:
+    print("kaçmalısın")
+
+# Döngüler ve aralıklar
+toplam = 0
+for i in 1..=10:            # 1'den 10'a DAHİL
+    toplam = toplam + i
+print(f"1..10 toplamı: {toplam}")
+
+n = 5
+while n > 0:
+    print(n)
+    n = n - 1
+
+# Sayı okunabilirliği
+buyuk = 1_000_000
+maske = 0xFF
+bayrak = 0b1010
+print(f"{buyuk} {maske} {bayrak}")
