@@ -1,68 +1,143 @@
 # RaidenScript
 
-> ⚠️ **Faz 0 — tasarım aşaması.** Henüz çalışan bir derleyici yok, olması da beklenmiyor.
-> Bu depo şu an bir dil *tanımından* ve örnek programlardan ibaret.
+> **Phase 1 complete — the language runs.**
+> Lexer, parser, resolver, tree-walking interpreter and REPL all work.
+> Types, bytecode VM and embedding come next. Expect breaking changes before v1.0.
 
-**RaidenScript** (kısaca **RS**), gömülebilir bir betik dili. Python'un okunabilirliğini,
-JavaScript'in çalışma modelini, C++'ın isteğe bağlı tiplerini ve HTML'in bildirimsel
-arayüz fikrini tek dilde birleştirmeyi hedefliyor.
+**RaidenScript** (**RS**) is an embeddable scripting language. You can write
+standalone programs with it, but its real purpose is to go *inside* another
+application and make it programmable: mods for a game, plugins for a server,
+automation for a desktop app.
 
 ```python
-fn selamla(ad: str) -> str:
-    return f"Merhaba {ad}"
+fn greet(name: str) -> str:
+    return f"Hello {name}"
 
-class Gemi(Varlik):
+class Ship(Entity):
     hp: int = 100
-    fn ciz(self, yzc):
-        yzc.sprite("ship", self.x, self.y)
+    fn draw(self, painter):
+        painter.sprite("ship", self.x, self.y)
 
-view Hud(oyuncu):
+# Declarative UI lives in the language, not in a separate template file
+view Hud(player):
     <column gap=4 pad=8>
-        <bar value={oyuncu.hp} max=100 color="#e33"/>
-        <button on_click={() => magazaAc()}>MAĞAZA</button>
+        <bar value={player.hp} max=100 color="#e33"/>
+        <button on_click={() => openShop()}>SHOP</button>
     </column>
 ```
 
-## Neden?
+It borrows a different layer from each of four languages:
 
-Tek başına çalışan programlar yazılabilir, ama asıl amaç **başka bir uygulamanın
-içine girip ona programlanabilirlik kazandırmak**: oyuna mod, sunucuya plugin,
-masaüstü uygulamasına otomasyon.
-
-Dil çekirdeği kasıtlı olarak küçük (28 anahtar kelime). Güç, host'un sağladığı
-bağlayıcılardan gelir.
-
-## Adlandırma
-
-| | |
+| Source | What it contributes |
 |---|---|
-| Tam ad | RaidenScript |
-| Kısaltma | RS |
-| Komut | `rs` |
-| Uzantı | `.rai` — "**Rai**den"in ilk 3 harfi, aynı zamanda 雷 (gök gürültüsü) kökü |
+| **Python** | Readability — indentation blocks, f-strings, little punctuation |
+| **JavaScript** | Runtime model — closures, `async`/`await`, event loop, arrow functions |
+| **C++** | Optional static types, performance awareness, native embeddability |
+| **HTML** | `view` blocks — declarative UI inside the language itself |
 
-`.rs` kullanılamaz (Rust'ın), `.rds` R'ın, `.rsc` MikroTik'in, `.ra` RealAudio'nun.
+## Try it
 
-## Yol haritası
+Needs a C++20 compiler and `make`. On Windows,
+[w64devkit](https://github.com/skeeto/w64devkit) is the easiest option —
+`build.ps1` finds it automatically without touching your PATH.
 
-| Faz | İş | Durum |
+```bash
+make                                       # or: powershell -File build.ps1
+./build/rs run examples/01-temeller.rai
+./build/rs                                 # REPL
+```
+
+```
+>>> fn square(x):
+...     return x * x
+...
+>>> square(square(3))
+81
+>>> [1,2,3].map((x) => x * 10)
+[10, 20, 30]
+```
+
+## Design decisions worth knowing
+
+These are the choices that give the language its character. The rationale for
+each one is in [`SPEC.md`](SPEC.md).
+
+- **Only `nil` and `false` are falsy.** `0` and `""` are truthy. This kills the
+  classic `if count:` bug at the root.
+- **`/` always returns a float**, `//` is integer division. C's silent truncation
+  was rejected as a bug factory.
+- **No package registry.** Modules resolve straight from a git repository
+  (Go's model) — no server, no account, no infrastructure to run.
+- **The core stays small.** 28 keywords, hard-capped at 30 until v1.0. Power comes
+  from host bindings, not from the language growing.
+- **Diagnostics were built before the lexer.** Errors carry line/column, a source
+  excerpt, a caret and a hint — and the column counts UTF-8 *characters*, so it
+  lands correctly in non-ASCII source.
+
+```
+error: unexpected '!'
+ --> test.rai:3:7
+  |
+3 | c = 5 ! 3
+  |       ^
+  |
+  = hint: use 'not' for negation
+```
+
+## Why embeddable?
+
+The core is deliberately small. Everything domain-specific comes from bindings
+the host provides:
+
+| Binding | Host | Provides |
 |---|---|---|
-| 0 | Dil tanımı + örnek programlar | 🟡 sürüyor (7/30 örnek) |
-| 1 | Lexer, parser, AST, tree-walking yorumlayıcı | ⬜ |
-| 2 | Kademeli tipler, nil-güvenliği, stdlib | ⬜ |
-| 3 | Bytecode VM + çöp toplayıcı | ⬜ |
-| 4 | C API, WASM, gömme | ⬜ |
-| 5 | `view` — bildirimsel arayüz | ⬜ |
-| 6 | JVM köprüsü | ⬜ |
-| 7 | LSP, formatter, paket çözücü | ⬜ |
+| `game.*` | Browser game (WASM) | sprites, audio, input, entities |
+| `mc.*` | Minecraft server (JVM) | players, world, events, inventory |
+| `sys.*` | Desktop app (Node/native) | files, processes, network |
+| `serial.*` | Embedded / telemetry | ports, flight data |
+| `ui.*` | all | `view` renderer |
+
+`examples/06-oyun-modu.rai` and `examples/10-minecraft-plugin.rai` are the same
+language driving two completely different hosts, with the core untouched.
+
+## Roadmap
+
+| Phase | Work | Status |
+|---|---|---|
+| 0 | Language spec + example programs | ✅ done |
+| 1 | Lexer, parser, AST, resolver, interpreter, REPL | ✅ done |
+| 2 | Gradual types, nil-safety, standard library | ⬜ |
+| 3 | Bytecode VM + garbage collector | ⬜ |
+| 4 | C API, WASM, embedding | ⬜ |
+| 5 | `view` — declarative UI | ⬜ |
+| 6 | JVM bridge | ⬜ |
+| 7 | LSP, formatter, package resolver | ⬜ |
 | 8 | Self-hosting | ⬜ |
 
-## Dosyalar
+## Repository layout
 
-- [`SPEC.md`](SPEC.md) — dil tanımı, gramer, tasarım kararları ve gerekçeleri
-- [`examples/`](examples/) — örnek programlar (spec'i test etmenin tek gerçek yolu)
-- [`WORKLOG.md`](WORKLOG.md) — çalışma günlüğü
+| Path | Contents |
+|---|---|
+| [`SPEC.md`](SPEC.md) | Language definition, grammar, design decisions and rationale |
+| [`examples/`](examples/) | 15 example programs — also the regression suite |
+| [`src/`](src/) | The implementation (C++20) |
+| [`WORKLOG.md`](WORKLOG.md) | Development log, round by round |
+
+`SPEC.md` and `WORKLOG.md` are written in Turkish — they are working documents.
+Code, comments and this README are the parts meant for everyone.
+
+## Naming
+
+Full name **RaidenScript**, short **RS**, command `rs`, extension `.rai` — the
+first three letters of *Rai*den, and also 雷 (thunder).
+
+`.rs` belongs to Rust, `.rds` to R, `.rsc` to MikroTik RouterOS, `.ra` to RealAudio.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The *RaidenScript* name and the Raiden Technology
+brand are not covered by it.
 
 ---
 
-Raiden Technology
+Built by [Raiden Technology](https://github.com/RaidenTechnology).
