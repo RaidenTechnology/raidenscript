@@ -1,0 +1,78 @@
+# Metin işleme — string API'sinin sınırlarını zorlama
+
+# --- Temel işlemler ---
+s = "  Raiden Technology  "
+
+print(s.trim())                    # "Raiden Technology"
+print(s.trim().upper())            # "RAIDEN TECHNOLOGY"
+print(s.trim().lower())
+print(s.len())                     # ham uzunluk, boşluklar dahil
+
+# --- Bölme ve birleştirme ---
+csv = "pistol,smg,shotgun,railgun"
+silahlar = csv.split(",")
+print(silahlar.len())              # 4
+print(silahlar.join(" | "))
+
+satirlar = "bir\niki\nüç".split("\n")
+for satir in satirlar:
+    print(f"> {satir}")
+
+# --- Arama ---
+metin = "STAR BREAKER yayında"
+print(metin.contains("BREAKER"))       # true
+print(metin.startsWith("STAR"))        # true
+print(metin.endsWith("yayında"))       # true
+print(metin.indexOf("BREAKER"))        # 5, bulunamazsa -1
+
+# --- Değiştirme ---
+print(metin.replace("STAR", "VOID"))
+print("a-b-c".replaceAll("-", "+"))
+
+# --- Dilimleme ---
+ad = "RaidenScript"
+print(ad[0..6])                    # "Raiden"
+print(ad[6..])                     # "Script"  — üst sınır atlanabilir
+print(ad[-6..])                    # "Script"  — sondan
+print(ad[0])                       # "R" — tek karakter de str'dir, int değil
+
+# --- Karakter gezme ---
+sesliler = 0
+for harf in "RaidenScript":
+    if harf in "aeiouAEIOU":
+        sesliler = sesliler + 1
+print(f"{sesliler} sesli harf")
+
+# --- UTF-8 ---
+tr = "Yıldırım"
+print(tr.len())                    # KARAKTER sayısı (bayt değil) = 8
+print(tr.upper())                  # "YILDIRIM" — Türkçe ı/İ doğru çalışmalı
+print(tr[0..3])                    # "Yıl"
+
+# --- Biçimlendirme ---
+hp = 73
+maks = 100
+print(f"{hp}/{maks} (%{hp * 100 / maks:.1f})")
+
+kredi = 1234567
+print(f"{kredi:,}")                # 1,234,567
+
+# --- Sayı dönüşümü ---
+n = int("42")
+f = float("3.14")
+print(n + 1)
+print(str(99) + " CR")
+
+try:
+    kotu = int("abc")
+catch e:
+    print(f"dönüşüm hatası: {e.message}")
+
+# --- Çok satırlı ve ham ---
+sablon = """
+RaidenScript v0
+---------------
+"""
+yol = r"C:\Users\imrai\Documents"
+print(sablon)
+print(yol)

@@ -1,0 +1,126 @@
+# SUAS2026 İHA yer istasyonu — üçüncü host bağlayıcısı ('serial.*').
+# Sayısal ağırlıklı, gerçek zamanlı kod: dilin bu profildeki davranışı test ediliyor.
+
+use std.math
+
+class Telemetri:
+    enlem: f64 = 0.0
+    boylam: f64 = 0.0
+    irtifa: f64 = 0.0
+    hiz: f64 = 0.0
+    yonelim: f64 = 0.0
+    batarya: f64 = 100.0
+    uydu: int = 0
+
+    fn init(self):
+        self.damga = 0.0
+
+    fn gecerliMi(self) -> bool:
+        if self.uydu < 6:
+            return false
+        if self.enlem == 0.0 and self.boylam == 0.0:
+            return false
+        return true
+
+    fn ozet(self) -> str:
+        kilit = "KİLİT" if self.gecerliMi() else "ARIYOR"
+        return f"{kilit} | {self.irtifa:.1f}m | {self.hiz:.1f}m/s | %{self.batarya:.0f} | {self.uydu} uydu"
+
+
+# --- Mesaj çözümleme ---
+
+fn cozumle(satir: str) -> Telemetri?:
+    if not satir.startsWith("$TLM,"):
+        return nil
+
+    alanlar = satir.split(",")
+    if alanlar.len() < 8:
+        return nil
+
+    t = Telemetri()
+    try:
+        t.enlem   = float(alanlar[1])
+        t.boylam  = float(alanlar[2])
+        t.irtifa  = float(alanlar[3])
+        t.hiz     = float(alanlar[4])
+        t.yonelim = float(alanlar[5])
+        t.batarya = float(alanlar[6])
+        t.uydu    = int(alanlar[7])
+    catch e:
+        print(f"bozuk paket: {e.message}")
+        return nil
+
+    t.damga = serial.zaman()
+    return t
+
+
+# --- İki nokta arası mesafe (haversine) ---
+
+fn mesafe(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64:
+    R = 6371000.0
+    p1 = lat1 * math.PI / 180.0
+    p2 = lat2 * math.PI / 180.0
+    dp = (lat2 - lat1) * math.PI / 180.0
+    dl = (lon2 - lon1) * math.PI / 180.0
+
+    a = math.sin(dp / 2.0) * math.sin(dp / 2.0) + math.cos(p1) * math.cos(p2) * math.sin(dl / 2.0) * math.sin(dl / 2.0)
+    return R * 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+
+
+# --- Uçuş izleyici ---
+
+class Izleyici:
+    fn init(self, evLat: f64, evLon: f64):
+        self.evLat = evLat
+        self.evLon = evLon
+        self.gecmis = []
+        self.enYuksek = 0.0
+        self.uyarilar = []
+
+    fn ekle(self, t: Telemetri):
+        if not t.gecerliMi():
+            return
+
+        self.gecmis.push(t)
+        if t.irtifa > self.enYuksek:
+            self.enYuksek = t.irtifa
+
+        d = mesafe(self.evLat, self.evLon, t.enlem, t.boylam)
+
+        if d > 800.0:
+            self.uyar(f"MENZİL AŞILDI: {d:.0f}m")
+        if t.batarya < 25.0:
+            self.uyar(f"BATARYA DÜŞÜK: %{t.batarya:.0f}")
+        if t.irtifa > 120.0:
+            self.uyar(f"İRTİFA SINIRI: {t.irtifa:.0f}m")
+
+    fn uyar(self, mesaj: str):
+        self.uyarilar.push(mesaj)
+        serial.gonder(f"$WARN,{mesaj}\n")
+        print(f"⚠ {mesaj}")
+
+    fn rapor(self):
+        if self.gecmis.len() == 0:
+            print("veri yok")
+            return
+        son = self.gecmis[-1]
+        print(f"paket: {self.gecmis.len()} | tavan: {self.enYuksek:.1f}m | uyarı: {self.uyarilar.len()}")
+        print(son.ozet())
+
+
+# --- Ana döngü ---
+
+izleyici = Izleyici(39.925533, 32.866287)
+
+serial.ac("COM5", 57600)
+
+serial.on("satir", (satir) => {
+    t = cozumle(satir)
+    if t != nil:
+        izleyici.ekle(t)
+})
+
+serial.on("kopma", () => {
+    print("BAĞLANTI KOPTU")
+    izleyici.rapor()
+})

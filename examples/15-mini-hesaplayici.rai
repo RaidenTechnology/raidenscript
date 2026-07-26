@@ -1,0 +1,235 @@
+# Uçtan uca gerçek program: bir ifade hesaplayıcısı.
+#
+# Bilerek meta seçildi — RaidenScript'in kendi Faz 1 yorumlayıcısının küçük bir
+# provası. Lexer + Pratt parser + değerlendirici, hepsi RaidenScript'te.
+# Sorulan soru: "bu dille 100+ satırlık gerçek bir program yaşanır mı?"
+
+use std.math
+
+# =============== 1. LEXER ===============
+
+class Token:
+    fn init(self, tip: str, deger, konum: int):
+        self.tip = tip          # "sayi" | "op" | "parenAc" | "parenKapa" | "ad" | "son"
+        self.deger = deger
+        self.konum = konum
+
+    fn yazi(self) -> str:
+        return f"{self.tip}({self.deger})"
+
+
+class Lexer:
+    fn init(self, kaynak: str):
+        self.kaynak = kaynak
+        self.i = 0
+
+    fn bitti(self) -> bool:
+        return self.i >= self.kaynak.len()
+
+    fn bak(self) -> str:
+        return "" if self.bitti() else self.kaynak[self.i]
+
+    fn tokenlar(self) -> list[Token]:
+        cikti = []
+
+        while not self.bitti():
+            c = self.bak()
+
+            if c == " " or c == "\t":
+                self.i = self.i + 1
+                continue
+
+            if c in "0123456789":
+                cikti.push(self.sayiOku())
+                continue
+
+            if c in "abcdefghijklmnopqrstuvwxyz":
+                cikti.push(self.adOku())
+                continue
+
+            if c in "+-*/%^":
+                cikti.push(Token("op", c, self.i))
+                self.i = self.i + 1
+                continue
+
+            if c == "(":
+                cikti.push(Token("parenAc", c, self.i))
+                self.i = self.i + 1
+                continue
+
+            if c == ")":
+                cikti.push(Token("parenKapa", c, self.i))
+                self.i = self.i + 1
+                continue
+
+            throw Error(f"beklenmeyen karakter '{c}' (konum {self.i})")
+
+        cikti.push(Token("son", nil, self.i))
+        return cikti
+
+    fn sayiOku(self) -> Token:
+        basla = self.i
+        noktaVar = false
+
+        while not self.bitti():
+            c = self.bak()
+            if c in "0123456789":
+                self.i = self.i + 1
+                continue
+            if c == "." and not noktaVar:
+                noktaVar = true
+                self.i = self.i + 1
+                continue
+            break
+
+        metin = self.kaynak[basla..self.i]
+        return Token("sayi", float(metin), basla)
+
+    fn adOku(self) -> Token:
+        basla = self.i
+        while not self.bitti() and self.bak() in "abcdefghijklmnopqrstuvwxyz":
+            self.i = self.i + 1
+        return Token("ad", self.kaynak[basla..self.i], basla)
+
+
+# =============== 2. PRATT PARSER + DEĞERLENDİRİCİ ===============
+#
+# Öncelik tablosu — Faz 1'deki gerçek parser'ın aynı mantığı.
+
+ONCELIK = {
+    "+": 1,
+    "-": 1,
+    "*": 2,
+    "/": 2,
+    "%": 2,
+    "^": 3,      # sağ birleşmeli
+}
+
+FONKSIYONLAR = {
+    "sqrt": (x) => math.sqrt(x),
+    "abs":  (x) => 0.0 - x if x < 0.0 else x,
+    "sin":  (x) => math.sin(x),
+    "cos":  (x) => math.cos(x),
+}
+
+SABITLER = {
+    "pi": 3.141592653589793,
+    "e":  2.718281828459045,
+}
+
+
+class Parser:
+    fn init(self, tokenlar: list[Token]):
+        self.t = tokenlar
+        self.i = 0
+
+    fn simdiki(self) -> Token:
+        return self.t[self.i]
+
+    fn ilerle(self) -> Token:
+        tok = self.t[self.i]
+        self.i = self.i + 1
+        return tok
+
+    # Pratt'ın kalbi: minimum öncelikle çağır, daha düşüğü görünce dur.
+    fn ifade(self, minOncelik: int) -> f64:
+        sol = self.onek()
+
+        while true:
+            tok = self.simdiki()
+            if tok.tip != "op":
+                break
+
+            oncelik = ONCELIK[tok.deger]
+            if oncelik < minOncelik:
+                break
+
+            self.ilerle()
+
+            # sağ birleşmeli operatör aynı öncelikte tekrar iner
+            sonraki = oncelik if tok.deger == "^" else oncelik + 1
+            sag = self.ifade(sonraki)
+            sol = self.uygula(tok.deger, sol, sag)
+
+        return sol
+
+    fn onek(self) -> f64:
+        tok = self.ilerle()
+
+        if tok.tip == "sayi":
+            return tok.deger
+
+        if tok.tip == "op" and tok.deger == "-":
+            return 0.0 - self.ifade(4)          # tekli eksi, yüksek öncelik
+
+        if tok.tip == "parenAc":
+            deger = self.ifade(1)
+            kapa = self.ilerle()
+            if kapa.tip != "parenKapa":
+                throw Error(f"kapanmamış parantez (konum {tok.konum})")
+            return deger
+
+        if tok.tip == "ad":
+            if tok.deger in SABITLER:
+                return SABITLER[tok.deger]
+            if tok.deger in FONKSIYONLAR:
+                ac = self.ilerle()
+                if ac.tip != "parenAc":
+                    throw Error(f"'{tok.deger}' sonrası '(' bekleniyordu")
+                arg = self.ifade(1)
+                kapa = self.ilerle()
+                if kapa.tip != "parenKapa":
+                    throw Error(f"'{tok.deger}(' kapanmadı")
+                return FONKSIYONLAR[tok.deger](arg)
+            throw Error(f"bilinmeyen ad '{tok.deger}'")
+
+        throw Error(f"beklenmeyen {tok.yazi()} (konum {tok.konum})")
+
+    fn uygula(self, op: str, a: f64, b: f64) -> f64:
+        if op == "+":
+            return a + b
+        if op == "-":
+            return a - b
+        if op == "*":
+            return a * b
+        if op == "/":
+            if b == 0.0:
+                throw Error("sıfıra bölme")
+            return a / b
+        if op == "%":
+            return a % b
+        if op == "^":
+            return a ** b
+        throw Error(f"bilinmeyen operatör '{op}'")
+
+
+# =============== 3. KULLANIM ===============
+
+fn hesapla(kaynak: str) -> f64:
+    tokenlar = Lexer(kaynak).tokenlar()
+    p = Parser(tokenlar)
+    sonuc = p.ifade(1)
+
+    if p.simdiki().tip != "son":
+        throw Error(f"fazladan girdi (konum {p.simdiki().konum})")
+
+    return sonuc
+
+
+testler = [
+    "2 + 3 * 4",
+    "(2 + 3) * 4",
+    "2 ^ 3 ^ 2",           # sağ birleşmeli → 2^9 = 512
+    "-5 + 3",
+    "sqrt(16) + abs(-4)",
+    "pi * 2",
+    "10 / 4",
+    "2 +",                 # hata
+    "1 / 0",               # hata
+]
+
+for kaynak in testler:
+    try:
+        print(f"{kaynak}  =  {hesapla(kaynak)}")
+    catch e:
+        print(f"{kaynak}  →  HATA: {e.message}")

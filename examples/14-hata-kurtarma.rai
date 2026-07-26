@@ -1,0 +1,104 @@
+# Hata hiyerarşisi ve kurtarma stratejileri
+
+use std.json
+
+# --- Hata hiyerarşisi ---
+
+class UygulamaHatasi(Error):
+    fn init(self, mesaj: str, kod: int):
+        super.init(mesaj)
+        self.kod = kod
+
+class AgHatasi(UygulamaHatasi):
+    fn init(self, url: str, durum: int):
+        super.init(f"{url} → HTTP {durum}", durum)
+        self.url = url
+        self.yenidenDenenebilir = durum >= 500
+
+class AyrisimHatasi(UygulamaHatasi):
+    fn init(self, satir: int, sutun: int, ayrinti: str):
+        super.init(f"{satir}:{sutun} — {ayrinti}", 400)
+        self.satir = satir
+        self.sutun = sutun
+
+
+# --- Tipe göre yakalama ---
+# NOT: tek 'catch' bloğu var, ayrım 'is' ile yapılıyor.
+
+fn islem(url: str):
+    try:
+        veri = agdanCek(url)
+        return json.parse(veri)
+    catch e:
+        if e is AgHatasi:
+            if e.yenidenDenenebilir:
+                print(f"sunucu hatası, yeniden denenecek: {e.url}")
+                return nil
+            throw e                       # yeniden fırlat, üst kat ilgilensin
+        if e is AyrisimHatasi:
+            print(f"bozuk JSON, satır {e.satir}")
+            return {}
+        throw e                           # tanımadığımız hatayı yutma
+
+
+# --- Yeniden deneme, artan bekleme ile ---
+
+fn yenidenDene(isleyici, maksDeneme: int = 3):
+    deneme = 0
+    while deneme < maksDeneme:
+        try:
+            return isleyici()
+        catch e:
+            deneme = deneme + 1
+            if deneme >= maksDeneme:
+                print(f"{maksDeneme} deneme başarısız")
+                throw e
+            bekleme = 0.5 * (2 ** deneme)
+            print(f"deneme {deneme} başarısız, {bekleme}s sonra tekrar")
+            sys.bekle(bekleme)
+
+
+# --- finally: kaynak temizliği ---
+
+fn dosyaIsle(yol: str):
+    kaynak = nil
+    try:
+        kaynak = sys.ac(yol)
+        for satir in kaynak.satirlar():
+            if satir.startsWith("#"):
+                continue
+            print(satir)
+    catch e:
+        print(f"okuma hatası: {e.message}")
+    finally:
+        if kaynak != nil:
+            kaynak.kapat()               # hata olsa da olmasa da kapanır
+
+
+# --- İç içe try: kısmi başarıyı koru ---
+
+fn topluIsle(yollar: list[str]) -> map[str, any]:
+    sonuclar = {}
+    hatalar = []
+
+    for yol in yollar:
+        try:
+            sonuclar[yol] = dosyaIsle(yol)
+        catch e:
+            hatalar.push({"yol": yol, "hata": e.message})
+            continue                     # bir dosyanın hatası diğerlerini durdurmaz
+
+    if hatalar.len() > 0:
+        print(f"{hatalar.len()} dosya işlenemedi:")
+        for h in hatalar:
+            print(f"  {h['yol']}: {h['hata']}")
+
+    return sonuclar
+
+
+# --- Gömme sınırı: modun hatası host'u DÜŞÜRMEZ ---
+# Host her mod çağrısını sarmalar; aşağıdaki patlama log'a düşer,
+# uygulama çalışmaya devam eder.
+
+fn kotuMod():
+    throw Error("mod çöktü")

@@ -69,6 +69,8 @@ Bu tablo dilin karakterini belirler. Her satırın bir gerekçesi var; gerekçe 
 | Bölme | `/` **her zaman float**, `//` tam bölme | `5 / 2 == 2.5`. Sessiz tam sayı kırpması sinsi hata kaynağı — C'nin bu davranışı reddedildi |
 | Koşullu ifade | `a if kosul else b` | Yeni anahtar kelime gerekmiyor. Ok fonksiyonlarının içinde tek satırlık dallanma şart |
 | Çok satırlı lambda | `() => { ... }` süslü parantez | Girinti kuralına **resmi istisna**. Python lambda'yı tek ifadeye hapsettiği için bu kalıbı yazamaz; gömme API'sinin en sık deseni tam olarak bu |
+| Bileşik atama | `+= -= *= /= //= %= **=` | Deyim, ifade değil. Olmadan `self.i = self.i + 1` yazmak dili yaşanmaz kılıyordu |
+| Dilim uçları | İkisi de atlanabilir: `x[2..]`, `x[..3]`, `x[..]` | Metin ve liste işlemede sürekli lazım oluyor |
 | Modüller | `use "github.com/kullanici/repo"` | Go modeli — registry yok, sunucu yok, hesap yok, domain yok |
 | Yorum | `#` satır sonuna kadar | Python |
 | Dosya uzantısı | `.rai` | "Rai"den + 雷 kökü. Çakışan canlı format yok. `.rs`/`.rds`/`.rsc`/`.ra` alınamaz — yukarıdaki nota bak |
@@ -450,6 +452,11 @@ Lexer `INDENT` / `DEDENT` / `NEWLINE` token'ları üretir (Python modeli), ama �
    vardır ve dış string'in tırnağı iç ifadeyi bağlamaz:
    `f"kredi: {oyuncu["kredi"]}"` geçerlidir.
 
+4. **`=>` sonrası `{` HER ZAMAN bloktur, map değil.** `{` hem map literal'i hem
+   `brace_block` başlatabildiği için gerçek bir belirsizlik var. JavaScript'in ok
+   fonksiyonlarındaki çözümü aynen alınıyor: ok fonksiyonundan map döndürmek için
+   parantez şart — `(x) => ({"a": 1})`. Parantezsiz `{` bloktur.
+
 Ayrıca: `#` satır sonuna kadar yorumdur ve string içinde özel anlamı yoktur.
 
 ```ebnf
@@ -460,7 +467,8 @@ statement      = simple_stmt NEWLINE | compound_stmt ;
 simple_stmt    = assign | expr | return_stmt | "break" | "continue"
                | "pass" | throw_stmt | use_stmt ;
 
-assign         = [ "outer" ] target [ ":" type ] "=" expr ;
+assign         = [ "outer" ] target [ ":" type ] atama_op expr ;
+atama_op       = "=" | "+=" | "-=" | "*=" | "/=" | "//=" | "%=" | "**=" ;
 target         = IDENT | postfix "." IDENT | postfix "[" expr "]" ;
 
 return_stmt    = "return" [ expr ] ;
@@ -509,7 +517,8 @@ sum            = product { ( "+" | "-" ) product } ;
 product        = unary { ( "*" | "/" | "//" | "%" ) unary } ;
 unary          = ( "-" | "+" | "~" | "await" ) unary | power ;
 power          = postfix [ "**" unary ] ;
-postfix        = primary { "(" [ args ] ")" | "[" expr "]" | "." IDENT | "?." IDENT } ;
+postfix        = primary { "(" [ args ] ")" | "[" ( expr | dilim ) "]" | "." IDENT | "?." IDENT } ;
+dilim          = [ expr ] ( ".." | "..=" ) [ expr ] ;    (* iki uç da atlanabilir *)
 
 primary        = NUMBER | STRING | FSTRING | "true" | "false" | "nil"
                | IDENT | "self" | "super"
@@ -534,7 +543,8 @@ type           = IDENT [ "[" type { "," type } "]" ] [ "?" ]
 ### İÇERİDE ✅
 
 - `int`, `float`, `str`, `bool`, `nil`, `list`, `map`
-- Değişkenler, aritmetik, karşılaştırma, mantık
+- Değişkenler, aritmetik, karşılaştırma, mantık, **bileşik atama**
+- Koşullu ifade (`a if k else b`), dilimleme (açık uçlu dahil)
 - `if` / `elif` / `else`, `while`, `for..in`, `break`, `continue`
 - `fn`, kapanışlar, özyineleme, varsayılan parametreler, ok fonksiyonları
 - `class` — alanlar, metotlar, tekli kalıtım, `self`, `super`
@@ -605,6 +615,40 @@ Kararların ayrıntılı gerekçeleri (arşiv):
    açar. Tek satırlık lambda'da atama gerekiyorsa süslü parantez kullanılır:
    `(olay) => { olay.hedef.y = ... }`. Bu, kural 2'nin (brace_block) neden gerekli
    olduğunun ikinci kanıtı.
+
+### 11a-3. Üçüncü turda çıkanlar (26 Tem, `examples/11-15`)
+
+Beşi de `15-mini-hesaplayici.rai` gibi *gerçek* program yazarken çıktı — kısa örnekler
+bunları asla göstermezdi.
+
+9. **✅ Bileşik atama yoktu — eklendi.** `12` ve `15`'te onlarca kez `self.i = self.i + 1`
+   yazdım. Bu, dilin ergonomisindeki en büyük tek eksikti.
+   **Karar: `+= -= *= /= //= %= **=` eklendi** (deyim olarak, ifade olarak değil —
+   bkz #8). Yeni anahtar kelime gerekmedi, gramer maliyeti bir satır.
+
+10. **✅ Açık uçlu dilim gramerde yoktu — eklendi.** `11`'de `ad[6..]`, `12`'de
+    `liste[1..]` yazdım ama `range_expr` iki ucu da zorunlu kılıyordu.
+    **Karar: `dilim = [ expr ] ( ".." | "..=" ) [ expr ]`** — iki uç da atlanabilir.
+    `x[..3]`, `x[2..]`, hatta `x[..]` (kopya) geçerli.
+
+11. **🔴 `=>` sonrası `{` GERÇEK BİR BELİRSİZLİK.** `15`'te
+    `FONKSIYONLAR = {"sqrt": (x) => math.sqrt(x)}` yazarken fark ettim: `{` hem map
+    literal'i hem `brace_block` başlatıyor. `(x) => {...}` blok mu, map döndürme mi?
+    **Karar: JavaScript'in çözümü** — `=>` sonrası `{` her zaman bloktur; map döndürmek
+    için parantez şart: `(x) => ({"a": 1})`. §9 lexer kuralı 4'e işlendi.
+    **Bu bulgu Faz 1'de parser'ı yazarken bulunsaydı yeniden yazım gerekirdi.**
+
+12. **🟡 Tipli `catch` yok — karar ertelendi.** `14`'te tek `catch e:` + `if e is AgHatasi`
+    zinciri + elle `throw e` yazmak zorunda kaldım. Son `throw e`'yi unutmak bilinmeyen
+    hataları sessizce yutuyor — ciddi bir tuzak. Seçenekler: (a) `catch e: TipAdi:`
+    cümleleri eklemek (gramer maliyeti var), (b) böyle bırakıp belgelemek.
+    **Faz 2'ye park** — Faz 1'de zaten tek `catch` yeterli.
+
+13. **🟡 Bloklayan `sys.bekle()` olay döngüsünü kilitler.** `14`'te senkron bir
+    fonksiyonun içinde `sys.bekle(...)` yazdım. Tek iş parçacığı + olay döngüsü
+    modelinde bu host'u dondurur — gömülü bir betikte kabul edilemez.
+    **Karar: `sys.bekle` sadece `async fn` içinde `await` ile kullanılabilir.**
+    Senkron bloklama yok. Faz 3'te (async gelince) uygulanacak.
 
 ### 11b. Baştan bilinen açık sorular
 

@@ -140,3 +140,63 @@ gövde bu durumun da çözümü — kural 2'nin ikinci gerekçesi.
 
 - Örnekler 30'a — özellikle async, string işleme, algoritma, İHA telemetrisi
 - Sonra **Faz 1**: lexer → Pratt parser → AST → resolver → tree-walking yorumlayıcı
+
+---
+
+## 26 Temmuz 2026 — Faz 0 TAMAM (15/15 örnek, 13 kusur)
+
+**Dönüm noktası:** Tasarım fazı kapandı. Kod yazmaya hazırız.
+
+### Kapsam kararı
+
+30 örnek hedefi **15'e indirildi**. Gerekçe: 10 örnek zaten 8 kusur bulmuştu ve
+getiri azalıyordu; kalan bütçe *tekrar* yerine **test edilmemiş alana** harcandı.
+15 hedefli örnek, 30 doldurma örnekten daha çok kusur buldu — nitekim son 5 örnek
+tek başına 5 kusur çıkardı.
+
+### Son 5 örnek
+
+- `11-metin` — string API'si, dilimleme, UTF-8/Türkçe, biçimlendirme
+- `12-algoritmalar` — kabarcık/hızlı sıralama, ikili arama, notlamalı fibonacci, asal eleği
+- `13-iha-telemetri` — **üçüncü host bağlayıcısı** (`serial.*`), SUAS2026 yer istasyonu
+- `14-hata-kurtarma` — hata hiyerarşisi, yeniden deneme, `finally` ile kaynak temizliği
+- `15-mini-hesaplayici` — **RaidenScript'te yazılmış lexer + Pratt parser + değerlendirici**
+
+`15` kasıtlı olarak meta seçildi: Faz 1'de C++'ta yazacağımız şeyin RaidenScript'teki
+provası. En çok kusuru o buldu — çünkü ilk kez 200 satırlık *gerçek* bir program yazıldı.
+
+### Yeni 5 kusur (9-13)
+
+| # | Kusur | Karar |
+|---|---|---|
+| 9 | **Bileşik atama yoktu** — `self.i = self.i + 1` onlarca kez | ✅ `+= -= *= /= //= %= **=` eklendi |
+| 10 | **Açık uçlu dilim gramerde yoktu** — `x[6..]` yazılamıyordu | ✅ İki uç da atlanabilir oldu |
+| 11 | **🔴 `=>` sonrası `{` gerçek belirsizlik** — blok mu map mi? | ✅ JS çözümü: `{` her zaman blok, map için `({...})` |
+| 12 | Tipli `catch` yok, `is` zinciri + elle rethrow gerekiyor | 🅿 Faz 2'ye park |
+| 13 | Bloklayan `sys.bekle()` olay döngüsünü kilitler | ✅ Sadece `async fn` içinde `await` ile |
+
+**11 numara en değerlisi:** `{` hem map literal'i hem `brace_block` başlatıyordu.
+Faz 1'de parser yazılırken bulunsaydı yeniden yazım gerekirdi. Faz 0'ın var olma
+sebebi tam olarak bu.
+
+### Faz 0 bilançosu
+
+- 3 belge (SPEC / README / WORKLOG), 15 örnek program
+- **13 kusur bulundu ve 11'i çözüldü** (2'si bilinçli olarak sonraki faza park)
+- Tek satır derleyici kodu yazılmadı — ve yazılmamalıydı
+
+### Sırada: FAZ 1
+
+```
+1  Proje iskeleti   CMake + C++20, klasör yapısı, test koşucusu
+2  Lexer            token tipleri, satır/sütun, INDENT/DEDENT,
+                    f-string alt-lexer'ı, brace-block modu
+3  AST              düğüm tipleri + ziyaretçi altyapısı
+4  Parser           recursive descent (deyim) + Pratt (ifade)
+5  Resolver         kapsam zinciri, isim çözümleme, kapanış upvalue'ları
+6  Yorumlayıcı      tree-walking, değer temsili, ortamlar
+7  CLI + REPL       `rs run dosya.rai` + etkileşimli kabuk
+8  Hata mesajları   kaynak satırı + ok işareti
+```
+
+**İlk dönüm noktası:** `rs run examples/01-temeller.rai` çalışsın.

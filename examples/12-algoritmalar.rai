@@ -1,0 +1,120 @@
+# Algoritmalar — gerçek kodda ergonomi testi.
+# Buradaki amaç dilin "yazarken ne kadar yorduğunu" ölçmek.
+
+use std.math
+
+# --- Kabarcık sıralama (bilerek elle, dilin döngü yükünü görmek için) ---
+
+fn kabarcikSirala(liste: list[int]) -> list[int]:
+    a = liste.copy()
+    n = a.len()
+    for i in 0..n:
+        for j in 0..(n - i - 1):
+            if a[j] > a[j + 1]:
+                gecici = a[j]
+                a[j] = a[j + 1]
+                a[j + 1] = gecici
+    return a
+
+print(kabarcikSirala([5, 2, 9, 1, 7, 3]))
+
+
+# --- Hızlı sıralama (özyinelemeli, kapanışlı) ---
+
+fn hizliSirala(liste: list[int]) -> list[int]:
+    if liste.len() <= 1:
+        return liste
+
+    eksen = liste[0]
+    kalan = liste[1..]
+
+    kucuk = kalan.filter((x) => x <= eksen)
+    buyuk = kalan.filter((x) => x > eksen)
+
+    return hizliSirala(kucuk) + [eksen] + hizliSirala(buyuk)
+
+print(hizliSirala([5, 2, 9, 1, 7, 3]))
+
+
+# --- İkili arama ---
+
+fn ikiliAra(sirali: list[int], hedef: int) -> int:
+    alt = 0
+    ust = sirali.len() - 1
+
+    while alt <= ust:
+        orta = (alt + ust) // 2          # // tam bölme — / olsaydı float dönerdi
+        deger = sirali[orta]
+
+        if deger == hedef:
+            return orta
+        if deger < hedef:
+            alt = orta + 1
+        else:
+            ust = orta - 1
+
+    return -1
+
+sirali = [1, 3, 5, 7, 9, 11, 13]
+print(ikiliAra(sirali, 7))       # 3
+print(ikiliAra(sirali, 8))       # -1
+
+
+# --- Fibonacci: özyineleme + notlama (memoization) ---
+
+fn fibNotlu():
+    onbellek = {}
+    fn fib(n: int) -> int:
+        if n <= 1:
+            return n
+        if n in onbellek:
+            return onbellek[n]
+        sonuc = fib(n - 1) + fib(n - 2)
+        onbellek[n] = sonuc
+        return sonuc
+    return fib
+
+fib = fibNotlu()
+print(fib(50))
+
+
+# --- Kelime sayacı ---
+
+fn kelimeSay(metin: str) -> map[str, int]:
+    sayac = {}
+    for kelime in metin.lower().split(" "):
+        k = kelime.trim()
+        if k == "":
+            continue
+        sayac[k] = (sayac[k] + 1) if k in sayac else 1
+    return sayac
+
+print(kelimeSay("raiden teknoloji raiden yıldırım teknoloji raiden"))
+
+
+# --- Asal elemesi ---
+
+fn asallar(limit: int) -> list[int]:
+    elek = []
+    for i in 0..=limit:
+        elek.push(true)
+
+    elek[0] = false
+    elek[1] = false
+
+    i = 2
+    while i * i <= limit:
+        if elek[i]:
+            k = i * i
+            while k <= limit:
+                elek[k] = false
+                k = k + i
+        i = i + 1
+
+    sonuc = []
+    for n in 0..=limit:
+        if elek[n]:
+            sonuc.push(n)
+    return sonuc
+
+print(asallar(50))
