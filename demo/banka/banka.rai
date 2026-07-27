@@ -204,7 +204,7 @@ class Hesap:
     fn uygula(self, tarih: str, tur: str, tutar: int, aciklama: str):
         yeni = self.bakiye + tutar
         if yeni < 0:
-            throw Error("yetersiz bakiye")
+            throw Error("insufficient funds")
         self.bakiye = yeni
         if tutar < 0:
             self.gunlukCikis = self.gunlukCikis + (-tutar)
@@ -391,10 +391,15 @@ fn girisYap():
     try:
         if not musteri.dogrula(pin):
             kalan = 3 - musteri.yanlisPin
-            ui.durum("hata", "Wrong PIN", f"{kalan} attempts left")
+            # "1 attempts left" yanlış yazım. Tekil/çoğul bir metin kuralıdır ve
+            # yeri burasıdır — çizim katmanı bunu bilemez.
+            adet = "attempt" if kalan == 1 else "attempts"
+            ui.durum("hata", "Wrong PIN", f"{kalan} {adet} left", 0)
             return 1
     catch e:
-        ui.durum("hata", "Sign-in blocked", e.message)
+        # KALICI: kilitli hesabın sebebi ekranda kalmalı. Altı saniye sonra
+        # silinince kullanıcının elinde sebepsiz bir "giriş olmuyor" kalıyor.
+        ui.durum("hata", "Sign-in blocked", f"{e.message} — reload the page to reset the demo", 1)
         return 2
 
     ui.metin("musteriAd", musteri.adSoyad)
@@ -428,7 +433,7 @@ fn transferYap():
         yol = "Internal" if fis.dahili else "Wire transfer"
         ucretMetni = "no fee" if fis.ucret == 0 else f"fee {paraYaz(fis.ucret)}"
         ui.durum("ok", f"{paraYaz(tutar)} sent",
-                 f"{yol} · {ucretMetni} · kalan bakiye {paraYaz(fis.kalan)}")
+                 f"{yol} · {ucretMetni} · balance {paraYaz(fis.kalan)}")
     catch e:
         ui.durum("hata", "Transfer failed", e.message)
         hesaplariCiz()

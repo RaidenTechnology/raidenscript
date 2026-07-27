@@ -100,14 +100,20 @@
     },
 
     // tur: "ok" | "hata" | "bilgi"
-    durum: (tur, baslik, satir) => {
+    // kalici = 1 -> kutu kendiliğinden kapanmaz. HANGİ durumun kalıcı olacağına
+    // betik karar veriyor: kilitlenmiş bir hesabın sebebi altı saniye sonra
+    // ekrandan silinince kullanıcı "giriş çalışmıyor" sanıyor -- demoda tam
+    // olarak bu yaşandı.
+    durum: (tur, baslik, satir, kalici) => {
       const kutu = $('durum');
       kutu.className = 'durum durum-' + tur + ' gorunur';
       kutu.replaceChildren();
       kutu.appendChild(el('strong', null, baslik));
       kutu.appendChild(el('span', null, satir));
       clearTimeout(ui._zaman);
-      ui._zaman = setTimeout(() => kutu.classList.remove('gorunur'), 6000);
+      if (kalici !== 1) {
+        ui._zaman = setTimeout(() => kutu.classList.remove('gorunur'), 6000);
+      }
       return 0;
     },
 
