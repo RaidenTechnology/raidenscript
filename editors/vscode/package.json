@@ -1,0 +1,41 @@
+{
+  "name": "raidenscript",
+  "displayName": "RaidenScript",
+  "description": "Syntax highlighting for RaidenScript (.rai)",
+  "version": "0.1.0",
+  "publisher": "raidentechnology",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.63.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "raidenscript",
+        "aliases": [
+          "RaidenScript",
+          "raidenscript",
+          "rs"
+        ],
+        "extensions": [
+          ".rai"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/rai.png",
+          "dark": "./icons/rai.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "raidenscript",
+        "scopeName": "source.raidenscript",
+        "path": "./syntaxes/raidenscript.tmLanguage.json"
+      }
+    ]
+  }
+}

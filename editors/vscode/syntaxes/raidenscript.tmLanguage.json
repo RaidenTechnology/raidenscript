@@ -1,0 +1,233 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "RaidenScript",
+  "scopeName": "source.raidenscript",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#fstring" },
+    { "include": "#rawstring" },
+    { "include": "#string" },
+    { "include": "#number" },
+    { "include": "#declaration" },
+    { "include": "#view-tag" },
+    { "include": "#keyword" },
+    { "include": "#builtin" },
+    { "include": "#type-annotation" },
+    { "include": "#call" },
+    { "include": "#operator" },
+    { "include": "#identifier" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.raidenscript",
+      "match": "#.*$"
+    },
+
+    "fstring": {
+      "name": "string.quoted.interpolated.raidenscript",
+      "begin": "\\bf(\"\"\"|'''|\"|')",
+      "end": "\\1",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.raidenscript" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.raidenscript" } },
+      "patterns": [
+        {
+          "name": "meta.embedded.expression.raidenscript",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.raidenscript" } },
+          "endCaptures": { "0": { "name": "punctuation.section.embedded.end.raidenscript" } },
+          "patterns": [
+            {
+              "name": "constant.other.format-spec.raidenscript",
+              "match": ":[^}]*"
+            },
+            { "include": "#builtin" },
+            { "include": "#keyword" },
+            { "include": "#number" },
+            { "include": "#operator" },
+            { "include": "#identifier" }
+          ]
+        }
+      ]
+    },
+
+    "rawstring": {
+      "name": "string.quoted.raw.raidenscript",
+      "begin": "\\br(\"\"\"|'''|\"|')",
+      "end": "\\1",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.raidenscript" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.raidenscript" } }
+    },
+
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.raidenscript",
+          "begin": "(\"\"\"|''')",
+          "end": "\\1",
+          "patterns": [{ "include": "#escape" }]
+        },
+        {
+          "name": "string.quoted.double.raidenscript",
+          "begin": "\"",
+          "end": "\"|$",
+          "patterns": [{ "include": "#escape" }]
+        },
+        {
+          "name": "string.quoted.single.raidenscript",
+          "begin": "'",
+          "end": "'|$",
+          "patterns": [{ "include": "#escape" }]
+        }
+      ]
+    },
+
+    "escape": {
+      "name": "constant.character.escape.raidenscript",
+      "match": "\\\\(u\\{[0-9A-Fa-f]+\\}|[nrt0\\\\\"'])"
+    },
+
+    "number": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.raidenscript",
+          "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*([eE][+-]?[0-9]+)?\\b"
+        },
+        {
+          "name": "constant.numeric.float.raidenscript",
+          "match": "\\b[0-9][0-9_]*[eE][+-]?[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.raidenscript",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+
+    "declaration": {
+      "patterns": [
+        {
+          "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.function.raidenscript" },
+            "2": { "name": "entity.name.function.raidenscript" }
+          }
+        },
+        {
+          "match": "\\b(class|trait|view)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.class.raidenscript" },
+            "2": { "name": "entity.name.type.raidenscript" }
+          }
+        },
+        {
+          "match": "\\b(use)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
+          "captures": {
+            "1": { "name": "keyword.control.import.raidenscript" },
+            "2": { "name": "entity.name.namespace.raidenscript" }
+          }
+        }
+      ]
+    },
+
+    "view-tag": {
+      "comment": "view blocks carry HTML-like element syntax",
+      "patterns": [
+        {
+          "match": "(</?)([a-z][a-zA-Z0-9-]*)",
+          "captures": {
+            "1": { "name": "punctuation.definition.tag.raidenscript" },
+            "2": { "name": "entity.name.tag.raidenscript" }
+          }
+        }
+      ]
+    },
+
+    "keyword": {
+      "patterns": [
+        {
+          "name": "keyword.control.raidenscript",
+          "match": "\\b(if|elif|else|while|for|break|continue|return|try|catch|finally|throw|pass|await|async)\\b"
+        },
+        {
+          "name": "keyword.operator.word.raidenscript",
+          "match": "\\b(and|or|not|is|in|as)\\b"
+        },
+        {
+          "name": "storage.type.raidenscript",
+          "match": "\\b(fn|class|trait|view)\\b"
+        },
+        {
+          "name": "keyword.other.raidenscript",
+          "match": "\\b(use|outer)\\b"
+        },
+        {
+          "name": "constant.language.raidenscript",
+          "match": "\\b(true|false|nil)\\b"
+        },
+        {
+          "name": "variable.language.raidenscript",
+          "match": "\\b(self|super)\\b"
+        }
+      ]
+    },
+
+    "builtin": {
+      "comment": "SPEC 7.2 prelude - available without use",
+      "name": "support.function.builtin.raidenscript",
+      "match": "\\b(print|len|type|range|assert|Error)\\b(?=\\s*\\()"
+    },
+
+    "type-annotation": {
+      "patterns": [
+        {
+          "name": "support.type.raidenscript",
+          "match": "\\b(int|float|str|bool|list|map|fn)\\b\\??"
+        },
+        {
+          "match": "(:)\\s*([A-Z][A-Za-z0-9_]*)\\??",
+          "captures": {
+            "1": { "name": "punctuation.separator.type.raidenscript" },
+            "2": { "name": "entity.name.type.raidenscript" }
+          }
+        },
+        {
+          "match": "(->)\\s*([A-Za-z_][A-Za-z0-9_]*)\\??",
+          "captures": {
+            "1": { "name": "keyword.operator.arrow.raidenscript" },
+            "2": { "name": "entity.name.type.raidenscript" }
+          }
+        }
+      ]
+    },
+
+    "call": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": { "1": { "name": "entity.name.function.call.raidenscript" } }
+    },
+
+    "operator": {
+      "patterns": [
+        { "name": "keyword.operator.arrow.raidenscript", "match": "=>|->" },
+        { "name": "keyword.operator.range.raidenscript", "match": "\\.\\.=|\\.\\." },
+        { "name": "keyword.operator.optional.raidenscript", "match": "\\?\\.|\\?\\?|\\?" },
+        { "name": "keyword.operator.arithmetic.raidenscript", "match": "\\*\\*|//|[+\\-*/%]" },
+        { "name": "keyword.operator.comparison.raidenscript", "match": "==|!=|<=|>=|<|>" },
+        { "name": "keyword.operator.assignment.raidenscript", "match": "\\*\\*=|//=|[+\\-*/%]=|=" }
+      ]
+    },
+
+    "identifier": {
+      "patterns": [
+        {
+          "name": "entity.name.type.raidenscript",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "variable.other.raidenscript",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}
