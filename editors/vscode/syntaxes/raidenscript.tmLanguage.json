@@ -105,23 +105,24 @@
     },
 
     "declaration": {
+      "comment": "identifiers may hold UTF-8 letters (SPEC 2.2) - Latin-1/Extended-A covers Turkish",
       "patterns": [
         {
-          "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "\\b(fn)\\s+([A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)",
           "captures": {
             "1": { "name": "storage.type.function.raidenscript" },
             "2": { "name": "entity.name.function.raidenscript" }
           }
         },
         {
-          "match": "\\b(class|trait|view)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "\\b(class|trait|view)\\s+([A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)",
           "captures": {
             "1": { "name": "storage.type.class.raidenscript" },
             "2": { "name": "entity.name.type.raidenscript" }
           }
         },
         {
-          "match": "\\b(import|include)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
+          "match": "\\b(import|include)\\s+([A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_.\\u00C0-\\u024F]*)",
           "captures": {
             "1": { "name": "keyword.control.import.raidenscript" },
             "2": { "name": "entity.name.namespace.raidenscript" }
@@ -206,7 +207,7 @@
     },
 
     "call": {
-      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "match": "\\b([A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)\\s*(?=\\()",
       "captures": { "1": { "name": "entity.name.function.call.raidenscript" } }
     },
 
@@ -224,12 +225,13 @@
     "identifier": {
       "patterns": [
         {
+          "comment": "CamelCase reads as a type - includes Turkish uppercase (Ç Ğ İ Ö Ş Ü)",
           "name": "entity.name.type.raidenscript",
-          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+          "match": "\\b[A-Z\\u00C0-\\u00D6\\u00D8-\\u00DE\\u011E\\u0130\\u015E][A-Za-z0-9_\\u00C0-\\u024F]*\\b"
         },
         {
           "name": "variable.other.raidenscript",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+          "match": "\\b[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*\\b"
         }
       ]
     }

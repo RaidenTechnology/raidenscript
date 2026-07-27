@@ -5,12 +5,21 @@
   "version": "0.1.0",
   "publisher": "raidentechnology",
   "license": "MIT",
+  "icon": "icons/rai.png",
   "engines": {
     "vscode": "^1.63.0"
   },
   "categories": [
     "Programming Languages"
   ],
+  "keywords": [
+    "raidenscript",
+    "rai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RaidenTechnology/raidenscript.git"
+  },
   "contributes": {
     "languages": [
       {

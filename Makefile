@@ -27,6 +27,13 @@ SRC_DIR   := src
 BUILD_DIR := build
 TARGET    := $(BUILD_DIR)/rs
 
+# MinGW g++ uzantısız -o çıktısına .exe ekler; 'install' gerçek dosya adını arar.
+ifeq ($(OS),Windows_NT)
+  EXE := .exe
+else
+  EXE :=
+endif
+
 SOURCES := $(wildcard $(SRC_DIR)/*.cpp)
 OBJECTS := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES))
 DEPS    := $(OBJECTS:.o=.d)
@@ -37,7 +44,7 @@ LIB_OBJECTS := $(filter-out $(BUILD_DIR)/main.o,$(OBJECTS))
 LIB         := $(BUILD_DIR)/libraiden.a
 CAPI_TEST   := $(BUILD_DIR)/capi_test
 
-.PHONY: all lib run test clean
+.PHONY: all lib run test install uninstall clean
 
 all: $(TARGET)
 
@@ -106,6 +113,27 @@ run: $(TARGET)
 # C API koşumu. Ömür hatalarını yakalamak için: make DEBUG=1 test
 test: $(CAPI_TEST)
 	@./$(CAPI_TEST)
+
+# Yorumlayıcıyı kabuktan erişilebilir yere kurar: "rai deneme.rai".
+#
+# Varsayılan hedef ~/.local/bin — Windows'ta bu klasör kullanıcı PATH'inde
+# zaten var, yani kayıt defterine dokunmadan komut anında çalışır. Başka yer
+# istenirse: make install PREFIX=/başka/yer
+#
+# İsim build/rs -> rai: uzantı .rai, komut rai, dil RaidenScript.
+HOME_DIR := $(if $(HOME),$(HOME),$(USERPROFILE))
+PREFIX   ?= $(HOME_DIR)/.local
+BINDIR   ?= $(PREFIX)/bin
+
+install: $(TARGET)
+	@mkdir -p "$(BINDIR)"
+	@cp $(TARGET)$(EXE) "$(BINDIR)/rai$(EXE)"
+	@echo "--> $(BINDIR)/rai$(EXE)"
+	@echo "    dene: rai --version   (yeni bir kabuk penceresi gerekebilir)"
+
+uninstall:
+	@rm -f "$(BINDIR)/rai$(EXE)"
+	@echo "kaldırıldı: $(BINDIR)/rai$(EXE)"
 
 clean:
 	@rm -rf $(BUILD_DIR)

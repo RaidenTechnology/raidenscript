@@ -1,13 +1,7 @@
 // RaidenScript CLI
 //
-// Faz 1 ilerleyişi:
-//   [x] 1. iskelet + kaynak/konum katmanı + tanılama motoru
-//   [x] 2. lexer
-//   [ ] 3. AST
-//   [ ] 4. parser
-//   [ ] 5. resolver
-//   [ ] 6. yorumlayıcı
-//   [ ] 7. REPL
+// Faz 1 tamam: iskelet + kaynak/konum katmanı + tanılama motoru, lexer, AST,
+// parser, resolver, yorumlayıcı, REPL.
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -51,16 +45,17 @@ void yardim() {
         << "RaidenScript " << SURUM << "\n"
            "\n"
            "KULLANIM:\n"
-           "  rs run <dosya.rai>     bir dosyayı çalıştır\n"
-           "  rs                     REPL başlat\n"
-           "  rs --version           sürüm\n"
-           "  rs --help              bu yardım\n"
+           "  rai <dosya.rai>        bir dosyayı çalıştır\n"
+           "  rai run <dosya.rai>    aynısı, açık hâli\n"
+           "  rai                    REPL başlat\n"
+           "  rai --version          sürüm\n"
+           "  rai --help             bu yardım\n"
            "\n"
            "GELİŞTİRME:\n"
-           "  rs tokens <dosya.rai>  token dökümü\n"
-           "  rs ast <dosya.rai>     sözdizimi ağacı dökümü\n"
-           "  rs coz <dosya.rai>     isim çözümleme (resolver)\n"
-           "  rs tani <dosya.rai>    tanılama motorunu dosya üzerinde göster\n";
+           "  rai tokens <dosya.rai> token dökümü\n"
+           "  rai ast <dosya.rai>    sözdizimi ağacı dökümü\n"
+           "  rai coz <dosya.rai>    isim çözümleme (resolver)\n"
+           "  rai tani <dosya.rai>   tanılama motorunu dosya üzerinde göster\n";
 }
 
 int komutAst(const std::string& yol, bool sessiz) {
@@ -305,6 +300,13 @@ int main(int argc, char** argv) {
             return 1;
         }
         return komutTani(arg[1]);
+    }
+
+    // Alt komut değilse ve .rai ile bitiyorsa: dosya adı say. Kabuktan
+    // "rai deneme.rai" yazmak "rai run deneme.rai" ile aynı şeyi yapsın —
+    // python/node'un davranışı, ve dosyaya çift tıklamanın karşılığı.
+    if (ilk.size() > 4 && ilk.compare(ilk.size() - 4, 4, ".rai") == 0) {
+        return komutRun(ilk);
     }
 
     std::cerr << "hata: bilinmeyen komut '" << ilk << "'\n";

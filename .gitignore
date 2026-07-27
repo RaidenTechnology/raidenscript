@@ -6,4 +6,5 @@ dist/
 *.pdb
 .wasm
 .vscode/
+*.vsix
 devlog-*.txt

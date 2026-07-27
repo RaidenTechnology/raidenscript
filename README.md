@@ -47,6 +47,31 @@ make                                       # or: powershell -File build.ps1
 ./build/rs                                 # REPL
 ```
 
+To get a `rai` command on your shell instead of typing the build path:
+
+```bash
+make install                               # -> ~/.local/bin/rai
+rai examples/01-temeller.rai               # a bare .rai path means "run it"
+rai                                        # REPL
+```
+
+`~/.local/bin` is already on the user PATH on Windows, so nothing has to be
+registered and no shell profile is touched. `make install PREFIX=/somewhere/else`
+if you want it elsewhere, `make uninstall` to remove it.
+
+## Editor support
+
+[`editors/vscode/`](editors/vscode) is a VS Code extension: syntax highlighting,
+indentation rules and a file icon for `.rai`. Build and install it with
+
+```bash
+cd editors/vscode && python build-vsix.py
+code --install-extension raidenscript-0.1.0.vsix --force
+```
+
+Identifiers may hold UTF-8 letters, so the grammar highlights `değer` and `ölçüm`
+the same as `value` and `measure`.
+
 ```
 >>> fn square(x):
 ...     return x * x
