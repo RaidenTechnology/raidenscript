@@ -85,6 +85,10 @@ WASM_RUNTIME := '["ccall","cwrap","addFunction","removeFunction","UTF8ToString",
 
 wasm: $(WASM_OUT)
 
+# STACK_SIZE: emscripten'in varsayilani 64 KB. Agac yuruyen yorumlayicida her betik
+# cagrisi birkac C++ karesi demek -- olculdu: ~130 seviyede ozyineleme yigini tasiyor
+# ve tasma temiz bir hata degil, bellek bozulmasi (modul komple oluyor). 8 MB ile
+# guvenli derinlik 1000+, asilinca da yakalanabilir bir hata cikiyor. Maliyeti 3 bayt.
 $(WASM_OUT): $(WASM_SRC)
 	@mkdir -p $(WASM_DIR)
 	$(EMCXX) -std=c++20 -O2 -fwasm-exceptions $(WASM_SRC) -o $@ \
@@ -92,6 +96,7 @@ $(WASM_OUT): $(WASM_SRC)
 	  -sEXPORTED_FUNCTIONS=$(WASM_EXPORTS) \
 	  -sEXPORTED_RUNTIME_METHODS=$(WASM_RUNTIME) \
 	  -sALLOW_TABLE_GROWTH=1 -sALLOW_MEMORY_GROWTH=1 \
+	  -sSTACK_SIZE=8MB \
 	  -sENVIRONMENT=web,worker,node -sEXPORT_ES6=0
 	@echo "--> $@"
 
