@@ -1307,11 +1307,18 @@ void Interpreter::visit(const ImportStmt& s) {
         return;
     }
 
-    Value modul = s.isStd ? stdModul(s.path) : Value{Nil{}};
-    if (s.isStd && std::holds_alternative<Nil>(modul)) {
-        // Bilinmeyen std modülü: hata değil uyarı — Faz 2/3'te dolacak.
-        diag_->warning(s.span, "'" + s.path + "' henüz uygulanmadı",
-                       "şimdilik nil olarak tanımlanıyor");
+    Value modul{Nil{}};
+    if (s.isInclude) {
+        // 'include' std kütüphanesinden ÇÖZÜLMEZ — bağlayıcıyı host derlemeye katar.
+        diag_->warning(s.span, "'" + s.path + "' host bağlayıcısı henüz yok",
+                       "statik bağlayıcılar Faz 4'te gelecek; şimdilik nil olarak tanımlanıyor");
+    } else if (s.isStd) {
+        modul = stdModul(s.path);
+        if (std::holds_alternative<Nil>(modul)) {
+            // Bilinmeyen std modülü: hata değil uyarı — Faz 2/3'te dolacak.
+            diag_->warning(s.span, "'" + s.path + "' henüz uygulanmadı",
+                           "şimdilik nil olarak tanımlanıyor");
+        }
     }
     env_->define(ad, std::move(modul));
 }

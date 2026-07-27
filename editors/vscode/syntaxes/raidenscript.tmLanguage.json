@@ -121,7 +121,7 @@
           }
         },
         {
-          "match": "\\b(use)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
+          "match": "\\b(import|include)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
           "captures": {
             "1": { "name": "keyword.control.import.raidenscript" },
             "2": { "name": "entity.name.namespace.raidenscript" }
@@ -158,8 +158,12 @@
           "match": "\\b(fn|class|trait|view)\\b"
         },
         {
+          "name": "keyword.control.import.raidenscript",
+          "match": "\\b(import|include)\\b"
+        },
+        {
           "name": "keyword.other.raidenscript",
-          "match": "\\b(use|outer)\\b"
+          "match": "\\b(outer)\\b"
         },
         {
           "name": "constant.language.raidenscript",

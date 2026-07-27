@@ -87,7 +87,7 @@ void Parser::synchronize() {
         switch (peek().kind) {
             case Tok::KwFn: case Tok::KwClass: case Tok::KwTrait: case Tok::KwIf:
             case Tok::KwWhile: case Tok::KwFor: case Tok::KwReturn: case Tok::KwTry:
-            case Tok::KwImport: case Tok::Dedent:
+            case Tok::KwImport: case Tok::KwInclude: case Tok::Dedent:
                 return;
             default:
                 advance();
@@ -166,8 +166,8 @@ StmtPtr Parser::statement() {
 StmtPtr Parser::simpleStatement() {
     const Token& bas = peek();
 
-    if (check(Tok::KwImport)) {
-        return importStatement();
+    if (check(Tok::KwImport) || check(Tok::KwInclude)) {
+        return ImportStatement();
     }
 
     if (match(Tok::KwBreak)) {
@@ -369,14 +369,26 @@ StmtPtr Parser::tryStatement() {
     return s;
 }
 
-StmtPtr Parser::importStatement() {
+StmtPtr Parser::ImportStatement() {
     const Token& bas = advance();
     auto s = make<ImportStmt>(bas.span);
+    s->isInclude = (bas.kind == Tok::KwInclude);
 
     if (check(Tok::Str)) {
-        s->path = advance().text;
+        const Token& yol = advance();
+        s->path = yol.text;
+        // 'include' derleme anında çözülür: ortada repo çekecek bir çalışma zamanı yok.
+        if (s->isInclude) {
+            err(yol, "'include' tırnaklı yol alamaz",
+                "repo bağımlılıkları çalışma zamanında çözülür, 'import' kullan");
+        }
         if (match(Tok::At)) {
-            s->version = expect(Tok::Str, "sürüm etiketi").text;
+            const Token& surum = expect(Tok::Str, "sürüm etiketi");
+            s->version = surum.text;
+            if (s->isInclude) {
+                err(surum, "'include' sürüm etiketi alamaz",
+                    "sürüm çözümü ağ gerektirir, 'import ... @ \"v0.3.1\"' kullan");
+            }
         }
     } else {
         s->isStd = true;

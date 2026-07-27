@@ -29,8 +29,8 @@ enum class Tok : std::uint8_t {
     RawStr,    // r"..." (kaçış yok)
     FStr,      // f"..." — gövde HAM tutulur, parser alt-lexer'la tarar (SPEC §9 kural 3)
 
-    // --- anahtar kelimeler (28) ---
-    KwFn, KwClass, KwTrait, KwView, KwImport, KwAs, KwOuter,
+    // --- anahtar kelimeler (29) ---
+    KwFn, KwClass, KwTrait, KwView, KwImport, KwInclude, KwAs, KwOuter,
     KwIf, KwElif, KwElse, KwWhile, KwFor, KwIn, KwBreak,
     KwContinue, KwReturn, KwTry, KwCatch, KwFinally, KwThrow,
     KwAsync, KwAwait, KwSelf, KwSuper, KwTrue, KwFalse, KwNil, KwPass,

@@ -283,6 +283,7 @@ struct ImportStmt : StmtNode<ImportStmt> {
     std::string alias;     // 'as j' — boş olabilir
     std::string version;   // '@ "v0.3.1"' — boş olabilir
     bool isStd = false;    // noktalı ad mı, tırnaklı yol mu
+    bool isInclude = false;   // 'include' ile mi geldi — derleme aninda cozulur
 };
 
 // Bir kaynak dosyanın tamamı.

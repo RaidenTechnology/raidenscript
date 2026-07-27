@@ -6,9 +6,9 @@
 namespace rs {
 namespace {
 
-// Anahtar kelime tablosu. SPEC §7.1'deki 28 + 4 operatör anahtar kelimesi.
-// Sıralı tutuluyor ki gözle denetlenebilsin; arama doğrusal ama tablo 32 girişlik.
-constexpr std::array<std::pair<std::string_view, Tok>, 32> KEYWORDS{{
+// Anahtar kelime tablosu. SPEC §7.1'deki 29 + 4 operatör anahtar kelimesi.
+// Sıralı tutuluyor ki gözle denetlenebilsin; arama doğrusal ama tablo 33 girişlik.
+constexpr std::array<std::pair<std::string_view, Tok>, 33> KEYWORDS{{
     {"and", Tok::KwAnd},
     {"as", Tok::KwAs},
     {"async", Tok::KwAsync},
@@ -26,6 +26,7 @@ constexpr std::array<std::pair<std::string_view, Tok>, 32> KEYWORDS{{
     {"if", Tok::KwIf},
     {"import", Tok::KwImport},
     {"in", Tok::KwIn},
+    {"include", Tok::KwInclude},
     {"is", Tok::KwIs},
     {"nil", Tok::KwNil},
     {"not", Tok::KwNot},
@@ -79,6 +80,7 @@ std::string_view tokLexeme(Tok t) noexcept {
         case Tok::KwTrait:      return "trait";
         case Tok::KwView:       return "view";
         case Tok::KwImport:     return "import";
+        case Tok::KwInclude:    return "include";
         case Tok::KwAs:         return "as";
         case Tok::KwOuter:      return "outer";
         case Tok::KwIf:         return "if";

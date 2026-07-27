@@ -68,7 +68,13 @@ each one is in [`SPEC.md`](SPEC.md).
   was rejected as a bug factory.
 - **No package registry.** Modules resolve straight from a git repository
   (Go's model) — no server, no account, no infrastructure to run.
-- **The core stays small.** 28 keywords, hard-capped at 30 until v1.0. Power comes
+- **`import` and `include` differ by *when*, not by *what*.** `import` is resolved
+  at runtime — the standard library, a git repository, a pinned version.
+  `include` is resolved when the host builds you in, so it refuses quoted paths and
+  version tags: on an ESP32 there is no filesystem and nothing to fetch. Hardware
+  and software separate as a side effect, and the rule is one the compiler can
+  actually enforce. A file may use both — that is what a bridge looks like.
+- **The core stays small.** 29 keywords, hard-capped at 30 until v1.0. Power comes
   from host bindings, not from the language growing.
 - **Diagnostics were built before the lexer.** Errors carry line/column, a source
   excerpt, a caret and a hint — and the column counts UTF-8 *characters*, so it
@@ -141,3 +147,4 @@ brand are not covered by it.
 ---
 
 Built by [Raiden Technology](https://github.com/RaidenTechnology).
+

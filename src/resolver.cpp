@@ -442,6 +442,12 @@ void Resolver::visit(const ImportStmt& s) {
         ad = (k == std::string::npos) ? s.path : s.path.substr(k + 1);
     }
     if (!ad.empty()) {
+        // Köprü kalıbında bir dosya hem 'include' hem 'import' içerebilir; ikisi aynı
+        // adı bağlarsa biri diğerini sessizce gölgelemesin.
+        if (declaredHere(ad)) {
+            diag_->error(s.span, "'" + ad + "' adı zaten bağlı",
+                         "birine takma ad ver — 'import " + ad + " as " + ad + "Sw'");
+        }
         declare(ad, s.span);
     }
 }

@@ -71,7 +71,8 @@ Bu tablo dilin karakterini belirler. Her satırın bir gerekçesi var; gerekçe 
 | Çok satırlı lambda | `() => { ... }` süslü parantez | Girinti kuralına **resmi istisna**. Python lambda'yı tek ifadeye hapsettiği için bu kalıbı yazamaz; gömme API'sinin en sık deseni tam olarak bu |
 | Bileşik atama | `+= -= *= /= //= %= **=` | Deyim, ifade değil. Olmadan `self.i = self.i + 1` yazmak dili yaşanmaz kılıyordu |
 | Dilim uçları | İkisi de atlanabilir: `x[2..]`, `x[..3]`, `x[..]` | Metin ve liste işlemede sürekli lazım oluyor |
-| Modüller | `use "github.com/kullanici/repo"` | Go modeli — registry yok, sunucu yok, hesap yok, domain yok |
+| Modüller | `import "github.com/kullanici/repo"` | Go modeli — registry yok, sunucu yok, hesap yok, domain yok |
+| Donanım bağımlılığı | `include serial` | Çalışma zamanında çözülemeyen bağımlılık ayrı kelime ister; kural derleyicice uygulanabilir olur |
 | Yorum | `#` satır sonuna kadar | Python |
 | Dosya uzantısı | `.rai` | "Rai"den + 雷 kökü. Çakışan canlı format yok. `.rs`/`.rds`/`.rsc`/`.ra` alınamaz — yukarıdaki nota bak |
 
@@ -256,16 +257,70 @@ async fn main():
 
 ### 3.9 Modüller
 
+İki anahtar kelime var ve **farkları ne zaman çözüldükleridir**, ne getirdikleri değil.
+
 ```python
-use std.math                              # yerleşik kütüphane
-use std.json as j                         # yeniden adlandırma
-use "github.com/RaidenTechnology/rs-http"          # repo bazlı
-use "github.com/RaidenTechnology/rs-http" @ "v0.3.1"   # sürüm sabitleme
+import std.math                                        # yerleşik kütüphane
+import std.json as j                                   # yeniden adlandırma
+import "github.com/RaidenTechnology/rs-http"           # repo bazlı
+import "github.com/RaidenTechnology/rs-http" @ "v0.3.1"   # sürüm sabitleme
+
+include serial                                         # host'un derlemeye kattığı bağlayıcı
+include gpio as pin                                    # takma ad burada da geçerli
 
 print(math.sqrt(16))
 ```
 
-**Registry yok.** `use` bir git reposunu işaret eder, sürümler git tag'leridir. Bu kararın bedeli merkezi arama olmaması; kazancı hiçbir altyapı, hesap veya domain gerektirmemesi.
+| | `import` | `include` |
+|---|---|---|
+| Ne zaman çözülür | çalışma zamanında | derleme / gömme anında |
+| Kaynak | `std.*`, git reposu | yalnızca host'un derlemeye kattığı statik bağlayıcı |
+| Tırnaklı yol | serbest | **yasak** |
+| `@ sürüm` | serbest | **yasak** |
+| Tipik hedef | masaüstü, tarayıcı, sunucu | ESP32 — dosya sistemi ve paket çekme yok |
+
+`include`'un "donanım" demesi yan üründür; asıl söylediği **"bu bağımlılık çalışma zamanında
+çözülemez"**. Kural bu yüzden derleyici tarafından uygulanabilir:
+
+```
+hata: 'include' tırnaklı yol alamaz
+ --> kopru.rai:1:9
+  |
+1 | include "github.com/x/y"
+  |         ^^^^^^^^^^^^^^^^
+  |
+  = ipucu: repo bağımlılıkları çalışma zamanında çözülür, 'import' kullan
+```
+
+**Registry yok.** `import` bir git reposunu işaret eder, sürümler git tag'leridir. Bu kararın bedeli merkezi arama olmaması; kazancı hiçbir altyapı, hesap veya domain gerektirmemesi.
+
+#### Köprü kalıbı — ikisi aynı dosyada
+
+Bir dosya hem `include` hem `import` içerebilir; **asıl kullanım budur.** Donanımı bir
+uygulamaya bağlayan dosya tam olarak böyle görünür: donanım statik gelir, uygulama tarafı
+çalışma zamanında çözülür.
+
+```python
+include serial              # donanım
+include gpio
+
+import std.json             # uygulama tarafı
+import "github.com/RaidenTechnology/rs-http" @ "v0.3.1"
+
+fn telemetriGonder():
+    paket = serial.oku()
+    http.post("https://yer-istasyonu/api", json.stringify(paket))
+```
+
+Okuyan kişi ilk beş satıra bakıp "bu kod donanıma dokunuyor **ve** ağa çıkıyor" diyebilir.
+Biçim önerisi (kural değil): `include` satırları önce, statikten dinamiğe.
+
+Aynı adı ikisi birden bağlarsa **hata verilir** — biri diğerini sessizce gölgelemez:
+
+```
+hata: 'serial' adı zaten bağlı
+  = ipucu: birine takma ad ver — 'import serial as serialSw'
+```
 
 ### 3.10 `view` — bildirimsel arayüz (Faz 5)
 
@@ -383,20 +438,21 @@ Host bağlayıcıları (dil çekirdeğinin dışında, her proje için ayrı):
 
 ### 7.1 Anahtar kelimeler
 
-Toplam **28**. Bu sayı v1.0'a kadar 30'u geçmeyecek.
+Toplam **29**. Bu sayı v1.0'a kadar 30'u geçmeyecek — geriye **bir** boşluk kaldı.
 
 ```
-fn      class   trait   view    use     as      outer
-if      elif    else    while   for     in      break
-continue return try     catch   finally throw   async
-await   self    super   true    false   nil     pass
+fn      class   trait   view    import  include as
+outer   if      elif    else    while   for     in
+break   continue return try     catch   finally throw
+async   await   self    super   true    false   nil
+pass
 ```
 
 Operatör olarak da: `and` `or` `not` `is`
 
-### 7.2 Prelude — `use` gerektirmeden hazır isimler
+### 7.2 Prelude — `import` gerektirmeden hazır isimler
 
-Kasıtlı olarak **dar**. Bu listeye girmeyen her şey `use std.*` ister.
+Kasıtlı olarak **dar**. Bu listeye girmeyen her şey `import std.*` ister.
 Prelude büyüdükçe isim çakışması riski artar ve dilin "küçük çekirdek" sözü çürür.
 
 ```
@@ -413,7 +469,7 @@ Error               yerleşik hata SINIFI — kalıtılabilir, `message` alanı 
 `Error` bir sınıf olduğu için `class YetersizKredi(Error)` yazılabilir; tüm
 `throw` edilen değerler `Error`'dan türemek zorundadır.
 
-Matematik prelude'da **değildir** — `use std.math` ister. `sqrt()` çıplak yazılamaz.
+Matematik prelude'da **değildir** — `import std.math` ister. `sqrt()` çıplak yazılamaz.
 
 ---
 
@@ -495,7 +551,9 @@ target         = IDENT | postfix "." IDENT | postfix "[" expr "]" ;
 
 return_stmt    = "return" [ expr ] ;
 throw_stmt     = "throw" expr ;
-use_stmt       = "use" ( dotted_name | STRING [ "@" STRING ] ) [ "as" IDENT ] ;
+import_stmt    = "import" ( dotted_name | STRING [ "@" STRING ] ) [ "as" IDENT ]
+               | "include" dotted_name [ "as" IDENT ] ;
+               (* 'include' STRING ve '@' alamaz — derleme anında çözülür, bkz. §3.9 *)
 
 compound_stmt  = if_stmt | while_stmt | for_stmt | fn_decl
                | class_decl | trait_decl | try_stmt | view_decl ;
@@ -572,7 +630,7 @@ type           = IDENT [ "[" type { "," type } "]" ] [ "?" ]
 - `fn`, kapanışlar, özyineleme, varsayılan parametreler, ok fonksiyonları
 - `class` — alanlar, metotlar, tekli kalıtım, `self`, `super`
 - `try` / `catch` / `throw`
-- `use std.*` — sadece yerleşik modüller
+- `import std.*` — sadece yerleşik modüller
 - f-string
 - REPL + `rs run dosya.rai`
 - **Satır/sütun bilgili hata mesajları** (baştan, sonradan eklemek acı verir)
@@ -587,7 +645,8 @@ type           = IDENT [ "[" type { "," type } "]" ] [ "?" ]
 | Bytecode VM + GC | 3 |
 | `async` / `await` | 3 |
 | `@fast` | 3 |
-| Repo bazlı `use` | 4 |
+| Repo bazlı `import` | 4 |
+| `include` — host'un statik bağlayıcıları (Faz 1'de ayrıştırılır, nil bağlanır) | 4 |
 | C API / WASM / gömme | 4 |
 | `view` | 5 |
 | JVM köprüsü | 6 |

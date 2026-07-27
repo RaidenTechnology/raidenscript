@@ -318,7 +318,7 @@ void AstDumper::visit(const ImportStmt& s) {
     std::string ek = s.path;
     if (!s.version.empty()) { ek += " @ " + s.version; }
     if (!s.alias.empty()) { ek += " as " + s.alias; }
-    satir(s.isStd ? "import std" : "import repo", ek);
+    satir(s.isInclude ? "include" : (s.isStd ? "import std" : "import repo"), ek);
 }
 
 }  // namespace rs
