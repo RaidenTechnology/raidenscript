@@ -1,7 +1,9 @@
 build/
+dist/
 *.o
 *.d
 *.exe
 *.pdb
+.wasm
 .vscode/
 devlog-*.txt

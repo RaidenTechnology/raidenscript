@@ -52,6 +52,42 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 
 -include $(DEPS)
 
+# --- WASM (Faz 4 / adım 2) ---
+#
+# emscripten ayrı bir araç zinciri; w64devkit'ten bağımsız. Kurulum:
+#   C:\Users\imrai\tools\emsdk\emsdk_env.bat  (her oturumda, PATH'e emcc ekler)
+#
+# ALLOW_TABLE_GROWTH şart: JS tarafı host geri çağrısını addFunction ile
+# tabloya ekliyor, o da tablonun büyüyebilmesini gerektiriyor.
+#
+# -fwasm-exceptions ŞART ve performans kararıdır. emscripten C++ istisnalarını
+# varsayılan olarak KAPATIR; açık olmazsa ilk 'return' deyiminde __cxa_throw
+# çağrılır ve modül abort eder. Yorumlayıcı akış kontrolünü (return/break/
+# continue) ve betik istisnalarını C++ istisnasıyla taşıyor (interp.hpp).
+# Alternatif -fexceptions (JS tabanlı) her yerde çalışır ama HER fonksiyon
+# dönüşünde JS'e geçiş demek — bu mimaride kabul edilemez yavaş. Native wasm
+# EH: Chrome 95+, Firefox 100+, Safari 15.2+, Node 18+.
+EMCXX     ?= em++
+WASM_DIR  := dist
+WASM_OUT  := $(WASM_DIR)/raidenscript.js
+WASM_SRC  := $(filter-out $(SRC_DIR)/main.cpp,$(SOURCES))
+WASM_EXPORTS := '["_rs_new","_rs_free","_rs_set_host","_rs_register","_rs_eval","_rs_call","_rs_last_error","_malloc","_free"]'
+WASM_RUNTIME := '["ccall","cwrap","addFunction","removeFunction","UTF8ToString","stringToUTF8","lengthBytesUTF8","getValue","setValue","HEAPF64"]'
+
+.PHONY: wasm
+
+wasm: $(WASM_OUT)
+
+$(WASM_OUT): $(WASM_SRC)
+	@mkdir -p $(WASM_DIR)
+	$(EMCXX) -std=c++20 -O2 -fwasm-exceptions $(WASM_SRC) -o $@ \
+	  -sMODULARIZE=1 -sEXPORT_NAME=createRaidenScript \
+	  -sEXPORTED_FUNCTIONS=$(WASM_EXPORTS) \
+	  -sEXPORTED_RUNTIME_METHODS=$(WASM_RUNTIME) \
+	  -sALLOW_TABLE_GROWTH=1 -sALLOW_MEMORY_GROWTH=1 \
+	  -sENVIRONMENT=web,worker,node -sEXPORT_ES6=0
+	@echo "--> $@"
+
 lib: $(LIB)
 
 $(LIB): $(LIB_OBJECTS)
