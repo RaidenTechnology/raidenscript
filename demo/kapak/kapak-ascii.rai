@@ -1,0 +1,283 @@
+# RaidenScript cover — ASCII edition.
+#
+# A red lightning bolt drawn with ASCII characters, and the wordmark below it
+# built the same way. Two output modes:
+#
+#     CIKTI = "metin"  ->  prints the ASCII art itself
+#     CIKTI = "ppm"    ->  prints a PPM image of that art (each cell is drawn
+#                          with the 5x7 bitmap font defined in this file)
+#
+#     rai demo/kapak/kapak-ascii.rai > kapak.ppm
+#
+# The bolt is the same seven-point polygon as kapak.rai, but sampled on a
+# CHARACTER grid: every cell takes nine sub-samples, and the coverage picks a
+# character from a density ramp. That is where the shading comes from — no
+# anti-aliasing, just picking a denser glyph.
+
+CIKTI = "ppm"
+
+KOL = 105                    # characters across
+SATIR = 58                   # characters down
+HUCRE_W = 6                  # pixels per cell
+HUCRE_H = 8
+W = KOL * HUCRE_W            # 630
+H = SATIR * HUCRE_H          # 496
+
+# Density ramp, light to heavy. The index is the ink level of a cell.
+RAMPA = [" ", ".", ":", "-", "=", "+", "*", "#"]
+
+
+# ============================================================
+#  5x7 FONT (data, not a system font)
+# ============================================================
+
+FONT = {
+    "A": ["01110","10001","10001","11111","10001","10001","10001"],
+    "C": ["01110","10001","10000","10000","10000","10001","01110"],
+    "D": ["11110","10001","10001","10001","10001","10001","11110"],
+    "E": ["11111","10000","10000","11110","10000","10000","11111"],
+    "H": ["10001","10001","10001","11111","10001","10001","10001"],
+    "I": ["11111","00100","00100","00100","00100","00100","11111"],
+    "M": ["10001","11011","10101","10101","10001","10001","10001"],
+    "N": ["10001","11001","10101","10011","10001","10001","10001"],
+    "O": ["01110","10001","10001","10001","10001","10001","01110"],
+    "P": ["11110","10001","10001","11110","10000","10000","10000"],
+    "R": ["11110","10001","10001","11110","10100","10010","10001"],
+    "S": ["01111","10000","10000","01110","00001","00001","11110"],
+    "T": ["11111","00100","00100","00100","00100","00100","00100"],
+    "V": ["10001","10001","10001","10001","10001","01010","00100"],
+    "B": ["11110","10001","10001","11110","10001","10001","11110"],
+    "J": ["00111","00010","00010","00010","00010","10010","01100"],
+    "L": ["10000","10000","10000","10000","10000","10000","11111"],
+    "U": ["10001","10001","10001","10001","10001","10001","01110"],
+    "W": ["10001","10001","10001","10101","10101","11011","10001"],
+    "0": ["01110","10011","10101","10101","10101","11001","01110"],
+    "1": ["00100","01100","00100","00100","00100","00100","01110"],
+    # ramp glyphs
+    ".": ["00000","00000","00000","00000","00000","01100","01100"],
+    ":": ["00000","01100","01100","00000","01100","01100","00000"],
+    "-": ["00000","00000","00000","11111","00000","00000","00000"],
+    "=": ["00000","00000","11111","00000","11111","00000","00000"],
+    "+": ["00000","00100","00100","11111","00100","00100","00000"],
+    "*": ["00100","10101","01110","11111","01110","10101","00100"],
+    "#": ["01010","01010","11111","01010","11111","01010","01010"],
+    " ": ["00000","00000","00000","00000","00000","00000","00000"],
+}
+
+BOS = ["00000","00000","00000","00000","00000","00000","00000"]
+
+fn glif(k: str) -> list:
+    for a in FONT.keys():
+        if a == k:
+            return FONT[k]
+    return BOS
+
+
+# ============================================================
+#  THE BOLT, ON A CHARACTER GRID
+# ============================================================
+
+BOLT = [
+    [0.548, 0.060], [0.404, 0.430], [0.494, 0.430],
+    [0.446, 0.700], [0.628, 0.375], [0.534, 0.375], [0.606, 0.060],
+]
+
+# Ray casting in normalised space: odd number of crossings means inside.
+fn boltIcinde(nx, ny) -> bool:
+    icinde = false
+    n = len(BOLT)
+    i = 0
+    j = n - 1
+    while i < n:
+        xi = BOLT[i][0]
+        yi = BOLT[i][1]
+        xj = BOLT[j][0]
+        yj = BOLT[j][1]
+        if (yi > ny) != (yj > ny):
+            kesim = xi + (ny - yi) * (xj - xi) / (yj - yi)
+            if nx < kesim:
+                icinde = not icinde
+        j = i
+        i = i + 1
+    return icinde
+
+# Nine sub-samples per cell -> 0..8 coverage. Characters are twice as tall as
+# they are wide, so the vertical span of a cell is compensated here.
+BOLT_SATIR = 44              # the bolt occupies the first 44 rows
+
+fn kapsama(cx: int, cy: int) -> int:
+    sayac = 0
+    sy = 0
+    while sy < 3:
+        sx = 0
+        while sx < 3:
+            nx = (cx + (sx + 0.5) / 3.0) / KOL
+            ny = (cy + (sy + 0.5) / 3.0) / BOLT_SATIR
+            if boltIcinde(nx, ny):
+                sayac = sayac + 1
+            sx = sx + 1
+        sy = sy + 1
+    return sayac
+
+
+# ============================================================
+#  GRID
+# ============================================================
+#
+# Two parallel lists: the character in each cell, and its ink level (which is
+# also what picks the colour).
+
+fn izgaraKur() -> list:
+    n = KOL * SATIR
+    kar = []
+    ton = []
+    i = 0
+    while i < n:
+        kar.push(" ")
+        ton.push(0)
+        i = i + 1
+
+    # --- bolt ---
+    cy = 0
+    while cy < BOLT_SATIR:
+        cx = 0
+        while cx < KOL:
+            k = kapsama(cx, cy)
+            if k > 0:
+                # 1..9 sub-samples -> ramp index 1..7
+                seviye = 1 + (k - 1) * 6 // 8
+                kar[cy * KOL + cx] = RAMPA[seviye]
+                ton[cy * KOL + cx] = seviye
+            cx = cx + 1
+        cy = cy + 1
+
+    # --- wordmark: the 5x7 font, one character per font pixel ---
+    # Wordmark: font-stamped, one character per font pixel.
+    metinBas(kar, ton, "RAIDENSCRIPT", 16, 37, "#", 9)
+
+    # Subtitles: plain characters, one cell each. At font scale a 29-character
+    # line would need 174 columns and there are only 105 -- the first version
+    # ran straight off the edge.
+    duzYaz(kar, ton, "ONE INTERPRETER - THREE HOSTS", 47, 8)
+    duzYaz(kar, ton, "TERMINAL   WEB   JVM", 49, 8)
+    return [kar, ton]
+
+# Writes a line of plain characters, centred, one cell per character.
+fn duzYaz(kar: list, ton: list, metin: str, by: int, seviye: int):
+    bx = (KOL - len(metin)) // 2
+    i = 0
+    while i < len(metin):
+        ex = bx + i
+        if ex >= 0 and ex < KOL and by >= 0 and by < SATIR:
+            kar[by * KOL + ex] = metin[i]
+            ton[by * KOL + ex] = seviye
+        i = i + 1
+    return 0
+
+# Stamps text into the grid: every set pixel of a glyph becomes one character.
+fn metinBas(kar: list, ton: list, metin: str, bx: int, by: int, isaret: str, seviye: int):
+    i = 0
+    while i < len(metin):
+        g = glif(metin[i])
+        sy = 0
+        while sy < 7:
+            satir = g[sy]
+            sx = 0
+            while sx < 5:
+                if satir[sx] == "1":
+                    ex = bx + i * 6 + sx
+                    ey = by + sy
+                    if ex >= 0 and ex < KOL and ey >= 0 and ey < SATIR:
+                        kar[ey * KOL + ex] = isaret
+                        ton[ey * KOL + ex] = seviye
+                sx = sx + 1
+            sy = sy + 1
+        i = i + 1
+    return 0
+
+
+# ============================================================
+#  COLOUR
+# ============================================================
+#
+# Ink level 1..7 is the bolt: dark ember at the edges, hot core in the middle.
+# Level 8 is the subtitle (dim red), level 9 the wordmark (near white).
+
+KIRMIZI_R = [0,  92, 132, 168, 205, 232, 248, 255, 150, 244]
+KIRMIZI_G = [0,  14,  20,  26,  34,  52,  76,  96,  38, 238]
+KIRMIZI_B = [0,  20,  26,  30,  36,  46,  60,  76,  44, 236]
+
+
+# ============================================================
+#  OUTPUT
+# ============================================================
+
+fn metinYaz(kar: list):
+    cy = 0
+    while cy < SATIR:
+        parcalar = []
+        cx = 0
+        while cx < KOL:
+            parcalar.push(kar[cy * KOL + cx])
+            cx = cx + 1
+        print(parcalar.join(""))
+        cy = cy + 1
+    return 0
+
+fn ppmYaz(kar: list, ton: list):
+    print("P3")
+    print(f"{W} {H}")
+    print("255")
+
+    y = 0
+    while y < H:
+        cy = y // HUCRE_H
+        gy = y % HUCRE_H
+
+        # This character row, expanded once: the glyph row of every cell.
+        glifSatiri = []
+        tonSatiri = []
+        cx = 0
+        while cx < KOL:
+            g = glif(kar[cy * KOL + cx])
+            glifSatiri.push(g[gy] if gy < 7 else "00000")
+            tonSatiri.push(ton[cy * KOL + cx])
+            cx = cx + 1
+
+        satir = []
+        x = 0
+        while x < W:
+            cx = x // HUCRE_W
+            gx = x % HUCRE_W
+
+            # background: near black with a faint ember glow behind the bolt
+            dy = y - 150
+            dx = x - 315
+            d2 = dx * dx + dy * dy
+            p = 0
+            if d2 < 250000:
+                p = (250000 - d2) // 14000
+            r = 10 + p
+            g = 11 + p // 4
+            b = 15 + p // 3
+
+            if gx < 5:
+                if glifSatiri[cx][gx] == "1":
+                    t = tonSatiri[cx]
+                    r = KIRMIZI_R[t]
+                    g = KIRMIZI_G[t]
+                    b = KIRMIZI_B[t]
+
+            satir.push(f"{r} {g} {b}")
+            x = x + 1
+        print(satir.join(" "))
+        y = y + 1
+    return 0
+
+fn ciz():
+    ikili = izgaraKur()
+    if CIKTI == "metin":
+        return metinYaz(ikili[0])
+    return ppmYaz(ikili[0], ikili[1])
+
+ciz()

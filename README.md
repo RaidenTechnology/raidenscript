@@ -1,11 +1,14 @@
 <p align="center">
-  <img src="media/cover-630x500.png" alt="RaidenScript" width="630">
+  <img src="media/cover.png" alt="RaidenScript" width="630">
 </p>
 
 <p align="center">
-  <em>Every pixel of that image was computed by a RaidenScript program —
-  <a href="demo/kapak/kapak.rai">demo/kapak/kapak.rai</a>. No graphics library, in the
-  program or in the language.</em>
+  <em>That bolt is ASCII characters, and the image of it was computed pixel by
+  pixel — both by the same RaidenScript program,
+  <a href="demo/kapak/kapak-ascii.rai">demo/kapak/kapak-ascii.rai</a>. No graphics
+  library, in the program or in the language. The raw text is in
+  <a href="demo/kapak/cover.txt">cover.txt</a>; a second, shaded version lives in
+  <a href="demo/kapak/kapak.rai">kapak.rai</a>.</em>
 </p>
 
 # RaidenScript

@@ -1,37 +1,58 @@
-# Cover generator
+# Cover generators
 
-The cover image in the repository README is not a drawing. Every one of its
-315,000 pixels is computed by [`kapak.rai`](kapak.rai), which prints a plain
-PPM (P3) image to standard output.
+Two covers, both produced by RaidenScript programs. Neither uses a graphics
+library — there isn't one in the program, and there isn't one in the language.
+What they have is what the language has: numbers, strings, lists, maps, loops.
+
+| File | Output | Time |
+|---|---|---|
+| [`kapak-ascii.rai`](kapak-ascii.rai) | ASCII art — red bolt + wordmark. Prints the **text**, or a **PPM image** of that text. | ~6 s |
+| [`kapak.rai`](kapak.rai) | A shaded 630×500 image, computed pixel by pixel. | ~45 s |
 
 ```bash
-rai demo/kapak/kapak.rai > cover.ppm
+rai demo/kapak/kapak-ascii.rai > cover.ppm     # CIKTI = "ppm"  (default)
+rai demo/kapak/kapak-ascii.rai                 # CIKTI = "metin" -> the text art
+rai demo/kapak/kapak.rai       > gradient.ppm
 ```
 
-Takes about 45 seconds and produces a 630×500 image.
+The text output is checked in as [`cover.txt`](cover.txt).
 
-There is no graphics library involved — not in the program and not in the
-language. What the program has is what RaidenScript has: numbers, strings,
-lists, maps and loops.
+## How the ASCII bolt is drawn
 
-## What is in there
+The bolt is a **seven-point polygon**, and "is this point inside?" is answered by
+ray casting: walk the edges, count the crossings, odd means inside.
 
-| Part | How |
-|---|---|
-| Mesh gradient | three radial falloffs, squared distance, no `sqrt` needed |
-| Grid | `x % 42 == 0 or y % 42 == 0` |
-| Lightning bolt | a seven-point polygon, ray-casting point-in-polygon test |
-| Bolt rim light | the same test sampled three pixels to each side |
-| Text | a 5×7 bitmap font defined as data **inside the script** |
+That test runs on a **character grid**, not on pixels. Each of the 105×58 cells
+takes nine sub-samples, and the coverage (0–9) picks a character from a density
+ramp:
 
-The font is the part worth reading. There is no system font available to a
-sandboxed script, so the glyphs are lists of `"01110"` strings and
-`metinBas()` stamps them into a mask at an integer scale.
+```
+" . : - = + * #"
+```
 
-## Turning it into a PNG
+So the shading is not anti-aliasing — it is choosing a heavier glyph where more
+of the cell is covered. The same coverage number also picks the red: dark ember
+at the edges, hot core in the middle.
 
-The PPM is a plain text file, so any converter works. With Python's standard
-library alone, no dependencies:
+The wordmark uses the 5×7 bitmap font at the bottom of the file, but stamped at
+**character** resolution: every set pixel of a glyph becomes one `#` on the
+grid. The subtitles are written straight in, one character per cell — at font
+scale a 29-character line would need 174 columns and there are only 105, which
+the first version discovered by running off the right edge.
+
+## How the image comes out
+
+In `"ppm"` mode the same grid is rendered with the same font, this time at pixel
+resolution: 6×8 pixels per cell. Each pixel row expands the glyph row of every
+cell once, then walks across — that keeps the map lookup out of the inner loop.
+
+`kapak.rai` skips characters entirely and evaluates every pixel: three radial
+falloffs for the mesh gradient, a modulo for the grid, the same polygon for the
+bolt, and a rim light from sampling the polygon three pixels to each side.
+
+## Turning a PPM into a PNG
+
+Plain text in, PNG out, with the Python standard library alone:
 
 ```python
 import zlib, struct
@@ -52,9 +73,9 @@ png = (b'\x89PNG\r\n\x1a\n'
 open('cover.png','wb').write(png)
 ```
 
-## Note on strings
+## The one performance rule
 
 Rows are collected in a list and joined once. Writing `row = row + pixel` in the
 inner loop would be quadratic — measured 7.3× slower at 12,000 pieces, which at
-this image size is the difference between a coffee break and a working script.
-This is the one performance rule of the language you actually have to know.
+these image sizes is the difference between a coffee break and a working script.
+If you remember one thing about performance in this language, remember this one.
