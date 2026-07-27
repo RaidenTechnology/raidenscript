@@ -79,6 +79,8 @@
     const self = this;
     const dizeKanali = typeof M._rs_arg_str === 'function' &&
                        typeof M._rs_return_str === 'function';
+    // Henüz C tarafında yok; eklendiği gün bu köprü kendiliğinden kullanmaya başlar.
+    const hostFail = typeof M._rs_host_fail === 'function';
 
     // Betikten gelen çağrı buraya düşer. Sayılar HEAPF64'ten, dizeler
     // rs_arg_str'den okunur — hangisi olduğunu C tarafı biliyor, biz sormuyoruz.
@@ -101,7 +103,27 @@
         console.error('RaidenScript: host fonksiyonu yok -> ' + modul + '.' + fn);
         return 0;
       }
-      const sonuc = f.apply(null, args);
+      // İstisnanın WASM karelerinden geçmesine İZİN VERİLMEZ. Ölçüldü: kaçan bir JS
+      // istisnası yığın işaretçisini geri almıyor, kaybedilen alan bir daha dönmüyor
+      // (5.000 istisnada özyineleme derinliği 1000 -> 937, 50.000'de modül ölüyor).
+      // Web bağlayıcısında host hatası kaçınılmaz: eksik düğüm, geçersiz seçici.
+      let sonuc;
+      try {
+        sonuc = f.apply(null, args);
+      } catch (err) {
+        const mesaj = String((err && err.message) || err);
+        if (hostFail) {
+          // C tarafı destekliyorsa hata betiğe yakalanabilir bir Error olarak gider.
+          const ep = strYaz(M, modul + '.' + fn + ': ' + mesaj);
+          M._rs_host_fail(self.ptr, ep);
+          M._free(ep);
+          return 0;
+        }
+        // Desteklemiyorsa yapılabilecek en iyi şey gürültü çıkarmak: sessiz sıfır
+        // kötü, ama modülün ölmesi daha kötü. rs_host_fail eklenince bu dal düşer.
+        console.error('RaidenScript: host hatası yutuldu -> ' + modul + '.' + fn, err);
+        return 0;
+      }
       if (typeof sonuc === 'string') {
         if (!dizeKanali) {
           console.error('RaidenScript: bu .wasm dize kanalı olmadan derlenmiş — ' +

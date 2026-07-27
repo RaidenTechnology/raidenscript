@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAIDEN PARÇA — bilgisayar bileşenleri</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Arka plan katmanları: saf CSS, betik dokunmuyor. -->
+<div class="fon">
+  <div class="fon-mesh"></div>
+  <div class="fon-izgara"></div>
+  <div class="fon-parlama" id="fonParlama"></div>
+</div>
+
+<!-- Kaydırma ilerleme çubuğu — ScrollTimeline ile sürülüyor. -->
+<div class="ilerleme" id="ilerlemeCubugu"></div>
+
+<header class="ust">
+  <a class="marka" href="#">
+    <span class="marka-simge">⚡</span>
+    <span class="marka-ad" id="markaAd"></span>
+  </a>
+  <nav class="menu" id="menu"></nav>
+  <button class="sepet-dugme" id="sepetDugmesi" type="button">
+    <span id="sepetEtiket"></span>
+    <span class="rozet" id="sepetSayaci">0</span>
+  </button>
+</header>
+
+<!-- Betiğin kurduğu her şey buranın altına giriyor. -->
+<main id="kok"></main>
+
+<aside class="cekmece" id="cekmece" aria-hidden="true">
+  <div class="cekmece-ic" id="cekmeceIc"></div>
+</aside>
+<div class="perde" id="perde"></div>
+
+<div class="yukleniyor" id="yukleniyor">
+  <div class="yukleniyor-halka"></div>
+  <span>RaidenScript yükleniyor…</span>
+</div>
+
+<script src="../../dist/raidenscript.js"></script>
+<script src="../../bindings/js/rs-host.js"></script>
+<script src="../../bindings/js/web.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

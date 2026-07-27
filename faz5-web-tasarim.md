@@ -292,9 +292,43 @@ bir hedef yok; bağlayıcı varsa `view` olmadan da site yazılabilir (banka dem
 | 3 | Özyineleme derinliği sayacı + `Error` | C++ | H1'in native ayağı, sessiz ölümü bitirir |
 | 4 | `rs_call` dize dönüşünde sessiz 0 | C++ | H4 — en azından hata versin |
 | 5 | Dize `+=` yerinde ekleme (refcount==1) | C++ | H3 — 12k'da 7×, isteğe bağlı |
-| 6 | `bindings/js/web.js` + 14 ilkel | JS | Faz 5'in gövdesi |
-| 7 | `demo/site` — tek sayfa, ağır animasyon | .rai + CSS | Bağlayıcının kanıtı |
-| 8 | `view` blokları | C++ (lexer/parser) | Faz 5b, şeker |
+| 6 | `bindings/js/web.js` + 17 ilkel | ✅ yapıldı | `kaydir` ve `sayfaBagla` yolda eklendi |
+| 7 | `demo/site` — RAIDEN PARÇA mağazası | ✅ yapıldı | 424 düğüm, 0 host hatası, 83 ms kurulum |
+| 8 | Kaçan `Error`'un mesajı kayboluyor (H5) | C++ | aşağıda |
+| 9 | `view` blokları | C++ (lexer/parser) | Faz 5b, şeker |
+
+---
+
+## 5. Demo sırasında çıkan iki ek bulgu
+
+### 🟡 H5 — Betikten kaçan `Error`'un mesajı yok oluyor
+
+`sepeteEkle` hatası host'a şöyle ulaştı:
+
+```
+hata: betik istisna fırlattı: <Error>
+   --> magaza.rai:589:12
+```
+
+Konum, kaynak satırı ve ok işareti kusursuz — ama **hatanın kendi mesajı yok**,
+yerine tip adı basılıyor. `throw Error("tutar girilmedi")` yazan bir betikte o
+metin host'a hiç ulaşmıyor. `interp.cpp`'de istisna dışarı verilirken `message`
+alanı tanıya eklenmeli; tanı altyapısı zaten hazır olduğu için küçük bir iş.
+
+### 📐 Sınırda daraltma kuralı (belgelenecek, hata değil)
+
+`rs_host_fn` sayıları `double` taşıyor (capi.h). Olay geri çağrılarında gelen
+`0` aslında `0.0` ve **liste indisi olarak kullanılamıyor**:
+
+```python
+fn sepeteEkle(ham):
+    u = int(ham)          # ← olmazsa URUNLER[u] hata veriyor
+```
+
+Bu tasarım gereği doğru (sınırın tek sayı tipi olması bilinçli karar) ama
+SPEC'te "host'tan gelen sayılar kayan noktalıdır, indis olarak kullanmadan önce
+`int()` ile daralt" diye yazmıyor. Web bağlayıcısıyla birlikte bu, herkesin
+çarpacağı ilk duvar oldu — yazılmalı.
 
 Kapsam disiplini: bu listede dile eklenen **hiçbir anahtar kelime yok**. 29/30 sabit
 kalıyor, güç bağlayıcıdan geliyor — SPEC'in söz verdiği gibi.
