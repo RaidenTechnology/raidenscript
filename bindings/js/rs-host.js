@@ -77,6 +77,8 @@
     this._kapali = false;
 
     const self = this;
+    const dizeKanali = typeof M._rs_arg_str === 'function' &&
+                       typeof M._rs_return_str === 'function';
 
     // Betikten gelen çağrı buraya düşer. Sayılar HEAPF64'ten, dizeler
     // rs_arg_str'den okunur — hangisi olduğunu C tarafı biliyor, biz sormuyoruz.
@@ -85,7 +87,10 @@
       const fn = M.UTF8ToString(fnPtr);
       const args = new Array(argc);
       for (let i = 0; i < argc; i++) {
-        const sp = M._rs_arg_str(self.ptr, i);
+        // Dize kanalı olmayan ESKİ bir .wasm ile eşleşirsek sayı yoluna düş.
+        // Bu köprü dosyası tek başına kopyalanabiliyor (STAR BREAKER öyle
+        // yapıyor); eşleşmeyen çift sessiz çökme yerine eski davranışı versin.
+        const sp = dizeKanali ? M._rs_arg_str(self.ptr, i) : 0;
         args[i] = sp ? M.UTF8ToString(sp) : M.HEAPF64[(argsPtr >> 3) + i];
       }
       const mod = self.modules[modul];
@@ -98,6 +103,11 @@
       }
       const sonuc = f.apply(null, args);
       if (typeof sonuc === 'string') {
+        if (!dizeKanali) {
+          console.error('RaidenScript: bu .wasm dize kanalı olmadan derlenmiş — ' +
+                        modul + '.' + fn + ' dize döndüremez (make wasm ile yenile)');
+          return 0;
+        }
         const p = strYaz(M, sonuc);
         M._rs_return_str(self.ptr, p);
         M._free(p);
