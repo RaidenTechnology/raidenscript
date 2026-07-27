@@ -1,0 +1,561 @@
+# Bir banka uygulamasının çekirdeği ve terminal arayüzü.
+#
+# Bu örnek dili ZORLAMAK için yazıldı: para aritmetiği, IBAN doğrulama,
+# limit/ücret kuralları, hata yolları ve çizgi karakterleriyle ekran çizimi.
+# Oyuncak değil — yanlış hesaplarsa fark edilir.
+#
+# ÜÇ TASARIM KARARI
+#   1. Para KURUŞ cinsinden tamsayı tutulur. Kayan noktalı para, bankacılıkta
+#      yuvarlama hatası demektir; 0.1 + 0.2 == 0.30000000000000004.
+#      Bölmede '//' kullanılır — dilde '/' her zaman float döndürür.
+#   2. Kurallar (limit, ücret, para birimi) Banka'da, biçimlendirme arayüzde.
+#      İkisinin karışması, bir bankacılık uygulamasının en klasik hatası.
+#   3. Hatalar dönüş kodu değil, 'throw'. Sessizce 0 dönen bir transfer
+#      fonksiyonu, parayı kaybeden bir fonksiyondur.
+#
+# DİLDE HENÜZ OLMAYAN, BURADA KENDİMİZ YAZDIĞIMIZ ŞEYLER
+#   "-" * 40 (dize tekrarı)   -> tekrar()
+#   f"{x:>10}" (hizalama)     -> solaYasla() / sagaYasla()
+#   liste.sort()              -> sirala()
+#   harita.has(anahtar)       -> anahtarVar()
+#   saat/tarih                -> senaryoda sabit tarihler
+# Bunlar eksik sayılmaz; bir dilin ne kadarının kütüphaneye bırakılabileceğinin
+# ölçüsü. Hepsi RaidenScript'in kendisiyle yazıldı, host'a düşülmedi.
+
+import std.math
+
+
+# ============================================================
+#  1. METİN ARAÇLARI
+# ============================================================
+
+fn tekrar(s: str, n: int) -> str:
+    sonuc = ""
+    i = 0
+    while i < n:
+        sonuc = sonuc + s
+        i = i + 1
+    return sonuc
+
+fn solaYasla(s: str, genislik: int) -> str:
+    eksik = genislik - len(s)
+    return s + tekrar(" ", eksik) if eksik > 0 else s
+
+fn sagaYasla(s: str, genislik: int) -> str:
+    eksik = genislik - len(s)
+    return tekrar(" ", eksik) + s if eksik > 0 else s
+
+# Uzun metni çerçeveye sığdırır. Kutu çizen her arayüzün er geç yazmak
+# zorunda kaldığı fonksiyon: taşan tek satır bütün çerçeveyi bozar.
+fn kelimeSar(metin: str, genislik: int):
+    satirlar = []
+    parca = ""
+    for kelime in metin.split(" "):
+        deneme = kelime if parca == "" else parca + " " + kelime
+        if len(deneme) > genislik and parca != "":
+            satirlar.push(parca)
+            parca = kelime
+        else:
+            parca = deneme
+    if parca != "":
+        satirlar.push(parca)
+    return satirlar
+
+fn ortala(s: str, genislik: int) -> str:
+    eksik = genislik - len(s)
+    if eksik <= 0:
+        return s
+    sol = eksik // 2
+    return tekrar(" ", sol) + s + tekrar(" ", eksik - sol)
+
+
+# ============================================================
+#  2. PARA
+# ============================================================
+
+# 12345678 -> "123.456,78"  (binlik ayracı nokta, kuruş virgül — TR biçimi)
+fn binlikAyir(n: int) -> str:
+    metin = f"{n}"
+    sonuc = ""
+    sayac = 0
+    i = len(metin) - 1
+    while i >= 0:
+        if sayac > 0 and sayac % 3 == 0:
+            sonuc = "." + sonuc
+        sonuc = metin[i] + sonuc
+        sayac = sayac + 1
+        i = i - 1
+    return sonuc
+
+fn paraYaz(kurus: int) -> str:
+    isaret = "-" if kurus < 0 else ""
+    m = -kurus if kurus < 0 else kurus
+    lira = m // 100
+    kr = m % 100
+    kurusMetni = f"{kr}" if kr >= 10 else f"0{kr}"
+    return f"{isaret}{binlikAyir(lira)},{kurusMetni}"
+
+fn paraYazBirimli(kurus: int, birim: str) -> str:
+    return f"{paraYaz(kurus)} {birim}"
+
+
+# ============================================================
+#  3. IBAN — mod-97 (ISO 13616)
+# ============================================================
+#
+# Algoritma: ilk 4 karakteri sona taşı, harfleri A=10..Z=35 ile sayıya çevir,
+# ortaya çıkan ~30 basamaklı sayının 97'ye bölümünden kalan 1 olmalı.
+#
+# O sayı hiçbir tamsayı tipine sığmaz. Çözüm basamak basamak yürümek:
+# kalan = (kalan * 10 + basamak) % 97. Bu yüzden büyük sayı kütüphanesi
+# gerekmiyor — algoritmanın kendisi buna izin veriyor.
+
+RAKAMLAR = "0123456789"
+HARFLER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+fn karakterDegeri(k: str) -> str:
+    i = RAKAMLAR.indexOf(k)
+    if i >= 0:
+        return f"{i}"
+    j = HARFLER.indexOf(k)
+    if j >= 0:
+        return f"{j + 10}"
+    return ""
+
+fn ibanGecerli(iban: str) -> bool:
+    temiz = iban.replaceAll(" ", "").upper()
+    if len(temiz) != 26 or not temiz.startsWith("TR"):
+        return false
+
+    # ilk dördü sona taşı
+    tasinmis = ""
+    i = 4
+    while i < len(temiz):
+        tasinmis = tasinmis + temiz[i]
+        i = i + 1
+    i = 0
+    while i < 4:
+        tasinmis = tasinmis + temiz[i]
+        i = i + 1
+
+    kalan = 0
+    i = 0
+    while i < len(tasinmis):
+        basamaklar = karakterDegeri(tasinmis[i])
+        if basamaklar == "":
+            return false
+        j = 0
+        while j < len(basamaklar):
+            kalan = (kalan * 10 + RAKAMLAR.indexOf(basamaklar[j])) % 97
+            j = j + 1
+        i = i + 1
+    return kalan == 1
+
+fn ibanBicimle(iban: str) -> str:
+    temiz = iban.replaceAll(" ", "")
+    sonuc = ""
+    i = 0
+    while i < len(temiz):
+        if i > 0 and i % 4 == 0:
+            sonuc = sonuc + " "
+        sonuc = sonuc + temiz[i]
+        i = i + 1
+    return sonuc
+
+fn ibanMaskele(iban: str) -> str:
+    temiz = iban.replaceAll(" ", "")
+    bas = ""
+    i = 0
+    while i < 4:
+        bas = bas + temiz[i]
+        i = i + 1
+    son = ""
+    i = len(temiz) - 4
+    while i < len(temiz):
+        son = son + temiz[i]
+        i = i + 1
+    return f"{bas} **** **** **** **** {son}"
+
+
+# ============================================================
+#  4. LİSTE / HARİTA YARDIMCILARI
+# ============================================================
+
+fn anahtarVar(harita, anahtar) -> bool:
+    for k in harita.keys():
+        if k == anahtar:
+            return true
+    return false
+
+# Ekleme sıralaması — kayıt sayısı küçük, kararlı ve okunur olması yeterli.
+# kucukMu(a, b): a, b'den önce gelmeli mi?
+fn sirala(liste, kucukMu):
+    sonuc = liste.copy()
+    i = 1
+    while i < len(sonuc):
+        parca = sonuc[i]
+        j = i - 1
+        while j >= 0 and kucukMu(parca, sonuc[j]):
+            sonuc[j + 1] = sonuc[j]
+            j = j - 1
+        sonuc[j + 1] = parca
+        i = i + 1
+    return sonuc
+
+
+# ============================================================
+#  5. ALAN MODELİ
+# ============================================================
+
+class Islem:
+    fn init(self, tarih: str, tur: str, tutar: int, aciklama: str, bakiyeSonrasi: int):
+        self.tarih = tarih
+        self.tur = tur                    # "GİRİŞ" | "ÇIKIŞ" | "ÜCRET" | "FAİZ"
+        self.tutar = tutar                # işaretli, kuruş
+        self.aciklama = aciklama
+        self.bakiyeSonrasi = bakiyeSonrasi
+
+class Hesap:
+    fn init(self, iban: str, ad: str, birim: str, bakiye: int):
+        self.iban = iban.replaceAll(" ", "")
+        self.ad = ad
+        self.birim = birim
+        self.bakiye = bakiye
+        self.gecmis = []
+        self.gunlukCikis = 0
+
+    fn kaydet(self, tarih: str, tur: str, tutar: int, aciklama: str):
+        self.gecmis.push(Islem(tarih, tur, tutar, aciklama, self.bakiye))
+
+    # Bakiyeyi DEĞİŞTİREN tek yer burası. Kural: bakiye eksiye düşemez.
+    fn uygula(self, tarih: str, tur: str, tutar: int, aciklama: str):
+        yeni = self.bakiye + tutar
+        if yeni < 0:
+            throw Error(f"yetersiz bakiye — {self.ad} hesabında {paraYazBirimli(self.bakiye, self.birim)} var, {paraYazBirimli(-tutar, self.birim)} isteniyor")
+        self.bakiye = yeni
+        if tutar < 0:
+            self.gunlukCikis = self.gunlukCikis + (-tutar)
+        self.kaydet(tarih, tur, tutar, aciklama)
+
+    # Günlük limit sayacı gün dönümünde sıfırlanır. Dilde saat yok, o yüzden
+    # gün dönümü takvimden değil açık çağrıdan geliyor.
+    fn gunuKapat(self):
+        self.gunlukCikis = 0
+
+class Musteri:
+    fn init(self, no: str, adSoyad: str, pin: str):
+        self.no = no
+        self.adSoyad = adSoyad
+        self.pin = pin
+        self.hesaplar = []
+        self.yanlisPin = 0
+        self.bloke = false
+
+    fn dogrula(self, girilen: str) -> bool:
+        if self.bloke:
+            throw Error("hesap bloke — 3 hatalı PIN girişi")
+        if girilen == self.pin:
+            self.yanlisPin = 0
+            return true
+        self.yanlisPin = self.yanlisPin + 1
+        if self.yanlisPin >= 3:
+            self.bloke = true
+        return false
+
+class Banka:
+    fn init(self, ad: str, sube: str):
+        self.ad = ad
+        self.sube = sube
+        self.hesaplar = {}
+        self.gunlukLimit = 5000000        # 50.000,00
+        self.eftUcreti = 1550             # 15,50
+        self.kurlar = {"TRY": 1.0, "USD": 34.12, "EUR": 37.05}
+
+    fn hesapEkle(self, hesap):
+        if not ibanGecerli(hesap.iban):
+            throw Error(f"kurulum hatası: geçersiz IBAN {ibanBicimle(hesap.iban)}")
+        self.hesaplar[hesap.iban] = hesap
+        return hesap
+
+    fn bul(self, iban: str):
+        temiz = iban.replaceAll(" ", "").upper()
+        if not anahtarVar(self.hesaplar, temiz):
+            return nil
+        return self.hesaplar[temiz]
+
+    fn tlKarsiligi(self, kurus: int, birim: str) -> int:
+        if not anahtarVar(self.kurlar, birim):
+            throw Error(f"kur bilinmiyor: {birim}")
+        # int() şart: math.floor() float döndürür (C'nin floor'u gibi) ve
+        # float para, paraYaz()'ın binlik ayracını bozar. Kuruş = tamsayı.
+        return int(math.floor(kurus * self.kurlar[birim]))
+
+    # Transferin TEK kapısı. Sıra önemli: önce doğrula, sonra para oynat.
+    # Kontroller bittiğinde artık başarısız olamaz — yarım kalmış transfer yok.
+    fn transfer(self, kaynakIban: str, hedefIban: str, tutar: int, aciklama: str, tarih: str):
+        kaynak = self.bul(kaynakIban)
+        if kaynak == nil:
+            throw Error(f"gönderen hesap bulunamadı: {ibanBicimle(kaynakIban)}")
+        if tutar <= 0:
+            throw Error("tutar sıfırdan büyük olmalı")
+        if not ibanGecerli(hedefIban):
+            throw Error(f"alıcı IBAN geçersiz — {ibanBicimle(hedefIban)} kontrol basamağını (mod-97) geçmedi")
+
+        hedef = self.bul(hedefIban)
+        if hedef != nil and hedef.birim != kaynak.birim:
+            throw Error(f"para birimi uyuşmuyor — {kaynak.birim} hesaptan {hedef.birim} hesaba doğrudan transfer yapılamaz, döviz al/sat gerekir")
+
+        ucret = 0 if hedef != nil else self.eftUcreti
+        toplam = tutar + ucret
+
+        kalanLimit = self.gunlukLimit - kaynak.gunlukCikis
+        if toplam > kalanLimit:
+            throw Error(f"günlük transfer limiti aşıldı — kalan limit {paraYaz(kalanLimit)}, istenen {paraYaz(toplam)}")
+        if toplam > kaynak.bakiye:
+            throw Error(f"yetersiz bakiye — bakiye {paraYaz(kaynak.bakiye)}, gereken {paraYaz(toplam)} ({paraYaz(tutar)} + {paraYaz(ucret)} ücret)")
+
+        kaynak.uygula(tarih, "ÇIKIŞ", -tutar, aciklama)
+        if ucret > 0:
+            kaynak.uygula(tarih, "ÜCRET", -ucret, "EFT masrafı")
+        if hedef != nil:
+            hedef.uygula(tarih, "GİRİŞ", tutar, f"{aciklama} (havale)")
+
+        # NOT: f-string'in içindeki ifadede çift tırnak kullanılamıyor — lexer
+        # dizeyi orada bitiriyor. Bu yüzden parça dışarıda hesaplanıyor.
+        gun = tarih.replaceAll(".", "")
+        return {"tutar": tutar, "ucret": ucret, "kalan": kaynak.bakiye,
+                "dahili": hedef != nil, "dekont": f"DK{gun}{len(kaynak.gecmis)}"}
+
+
+# ============================================================
+#  6. ARAYÜZ — çizgi karakterleriyle ekran çizimi
+# ============================================================
+
+G = 64        # çerçevenin iç genişliği
+
+fn ustCizgi():
+    print("┌" + tekrar("─", G) + "┐")
+
+fn ayracCizgi():
+    print("├" + tekrar("─", G) + "┤")
+
+fn altCizgi():
+    print("└" + tekrar("─", G) + "┘")
+
+fn satir(metin: str):
+    print("│ " + solaYasla(metin, G - 2) + " │")
+
+fn ciftSatir(sol: str, sag: str):
+    bosluk = G - 2 - len(sol) - len(sag)
+    print("│ " + sol + tekrar(" ", bosluk if bosluk > 0 else 1) + sag + " │")
+
+fn baslikSatiri(metin: str):
+    print("│" + ortala(metin, G) + "│")
+
+fn bos():
+    satir("")
+
+fn ekran(baslik: str):
+    ustCizgi()
+    baslikSatiri(baslik)
+    ayracCizgi()
+
+
+# --- Giriş ekranı ---
+
+fn girisEkrani(banka, musteri, denemeler):
+    ekran(f"{banka.ad}  ·  İnternet Şubesi")
+    satir(f"Şube kodu : {banka.sube}")
+    satir(f"Müşteri no: {musteri.no}")
+    bos()
+
+    girildi = false
+    for pin in denemeler:
+        if girildi:
+            continue
+        maske = tekrar("•", len(pin))
+        try:
+            if musteri.dogrula(pin):
+                satir(f"PIN: {maske}   ✓ doğrulandı")
+                girildi = true
+            else:
+                kalan = 3 - musteri.yanlisPin
+                satir(f"PIN: {maske}   ✗ hatalı — {kalan} deneme hakkı kaldı")
+        catch e:
+            satir(f"PIN: {maske}   ⚠ {e.message}")
+
+    bos()
+    if girildi:
+        satir(f"Hoş geldiniz, {musteri.adSoyad}")
+    else:
+        satir("Oturum açılamadı.")
+    altCizgi()
+    print("")
+    return girildi
+
+
+# --- Hesap özeti ---
+
+fn hesapOzeti(banka, musteri):
+    ekran("HESAPLARIM")
+    toplamTL = 0
+    for h in musteri.hesaplar:
+        toplamTL = toplamTL + banka.tlKarsiligi(h.bakiye, h.birim)
+        ciftSatir(h.ad, paraYazBirimli(h.bakiye, h.birim))
+        satir("  " + ibanMaskele(h.iban))
+        bos()
+    ayracCizgi()
+    ciftSatir("TOPLAM VARLIK", paraYazBirimli(toplamTL, "TRY"))
+    altCizgi()
+    print("")
+
+
+# --- Transfer ---
+
+fn transferEkrani(banka, kaynak, hedefIban, hedefAd, tutar, aciklama, tarih):
+    ekran("PARA TRANSFERİ")
+    ciftSatir("Gönderen", kaynak.ad)
+    satir("  " + ibanMaskele(kaynak.iban))
+    bos()
+    ciftSatir("Alıcı", hedefAd)
+    satir("  " + ibanBicimle(hedefIban))
+    bos()
+    ciftSatir("Tutar", paraYazBirimli(tutar, kaynak.birim))
+    ciftSatir("Açıklama", aciklama)
+    ayracCizgi()
+
+    try:
+        fis = banka.transfer(kaynak.iban, hedefIban, tutar, aciklama, tarih)
+        yol = "Hesaplar arası" if fis.dahili else "EFT / Havale"
+        satir("✓ TRANSFER TAMAMLANDI")
+        bos()
+        ciftSatir("Yöntem", yol)
+        ciftSatir("İşlem ücreti", paraYazBirimli(fis.ucret, kaynak.birim))
+        ciftSatir("Kalan bakiye", paraYazBirimli(fis.kalan, kaynak.birim))
+        ciftSatir("Dekont no", fis.dekont)
+    catch e:
+        satir("✗ İŞLEM GERÇEKLEŞTİRİLEMEDİ")
+        bos()
+        for parca in e.message.split(" — "):
+            for sat in kelimeSar(parca, G - 4):
+                satir("  " + sat)
+        bos()
+        ciftSatir("Bakiye (değişmedi)", paraYazBirimli(kaynak.bakiye, kaynak.birim))
+    altCizgi()
+    print("")
+
+
+# --- Hesap hareketleri ---
+
+fn ekstre(hesap, baslik: str):
+    ekran(f"HESAP HAREKETLERİ · {baslik}")
+    satir(solaYasla("TARİH", 12) + solaYasla("İŞLEM", 10) + sagaYasla("TUTAR", 20) + sagaYasla("BAKİYE", 20))
+    ayracCizgi()
+
+    # En yeni üstte: kayıt sırasının tersi. Sıralama ölçütü açıkça verilir,
+    # çünkü "doğal sıra" diye bir şey yok — bu bir tercih.
+    ters = sirala(hesap.gecmis, (a, b) => a.tarih > b.tarih)
+    for isl in ters:
+        isaret = "+" if isl.tutar > 0 else ""
+        satir(solaYasla(isl.tarih, 12)
+              + solaYasla(isl.tur, 10)
+              + sagaYasla(isaret + paraYaz(isl.tutar), 20)
+              + sagaYasla(paraYaz(isl.bakiyeSonrasi), 20))
+        satir("  " + isl.aciklama)
+
+    ayracCizgi()
+    giren = hesap.gecmis.filter((i) => i.tutar > 0).reduce((t, i) => t + i.tutar, 0)
+    cikan = hesap.gecmis.filter((i) => i.tutar < 0).reduce((t, i) => t - i.tutar, 0)
+    ciftSatir(f"{len(hesap.gecmis)} işlem", f"giren {paraYaz(giren)}  ·  çıkan {paraYaz(cikan)}")
+    ciftSatir("GÜNCEL BAKİYE", paraYazBirimli(hesap.bakiye, hesap.birim))
+    altCizgi()
+    print("")
+
+
+# --- Faiz projeksiyonu ---
+
+fn faizProjeksiyonu(hesap, yillikOran, yil):
+    ekran("BİRİKİM PROJEKSİYONU")
+    ciftSatir("Hesap", hesap.ad)
+    ciftSatir("Anapara", paraYazBirimli(hesap.bakiye, hesap.birim))
+    # Ondalık ayracı: para her yerde virgüllü yazılıyor, oran nokta ile
+    # yazılırsa aynı ekranda iki farklı sayı biçimi olur.
+    oran = f"{yillikOran * 100:.2f}".replaceAll(".", ",")
+    ciftSatir("Yıllık net getiri", f"%{oran}")
+    ayracCizgi()
+    satir(solaYasla("YIL", 10) + sagaYasla("BAKİYE", 26) + sagaYasla("KAZANÇ", 26))
+    ayracCizgi()
+    y = 1
+    while y <= yil:
+        # Bileşik faiz: A = P(1+r)^n. Kuruşa yuvarlama floor ile — bankanın
+        # lehine değil, tek yönlü ve öngörülebilir olsun diye.
+        buyume = math.pow(1 + yillikOran, y)
+        bakiye = int(math.floor(hesap.bakiye * buyume))
+        satir(solaYasla(f"{y}. yıl", 10)
+              + sagaYasla(paraYaz(bakiye), 26)
+              + sagaYasla("+" + paraYaz(bakiye - hesap.bakiye), 26))
+        y = y + 1
+    altCizgi()
+    print("")
+
+
+# ============================================================
+#  7. SENARYO
+# ============================================================
+#
+# Dilde henüz saat yok, o yüzden tarihler sabit. Kurgu değil: aşağıdaki
+# bütün bakiyeler ve kalan limitler yukarıdaki kurallardan HESAPLANIYOR.
+
+banka = Banka("RAIDEN BANK", "0061")
+
+vadesiz = banka.hesapEkle(Hesap("TR330006100519786457841326", "Vadesiz Hesap", "TRY", 980060))
+birikim = banka.hesapEkle(Hesap("TR020006100519786457841399", "Birikim Hesabı", "TRY", 15000000))
+dolar   = banka.hesapEkle(Hesap("TR260006100519786457841355", "Döviz Hesabı", "USD", 320000))
+ayse    = banka.hesapEkle(Hesap("TR910006200119786457841426", "Ayşe Demir", "TRY", 89000))
+
+musteri = Musteri("4471029", "Emre Yıldırım", "8419")
+musteri.hesaplar = [vadesiz, birikim, dolar]
+
+# Geçmiş hareketler UYGULANARAK kuruluyor, elle kaydedilerek değil. Elle
+# kaydetmek ekstredeki yürüyen bakiye sütununu sessizce yalancı yapar:
+# satırlar görünür, bakiye ilerlemez.
+vadesiz.uygula("01.07.2026", "GİRİŞ", 3850000, "Maaş ödemesi")
+vadesiz.uygula("03.07.2026", "ÇIKIŞ", -47500, "Market alışverişi")
+vadesiz.gunuKapat()
+
+# 1) Giriş — ilk PIN yanlış, ikincisi doğru
+girisEkrani(banka, musteri, ["1234", "8419"])
+
+# 2) Hesap özeti
+hesapOzeti(banka, musteri)
+
+# 3) Aynı bankaya havale — ücretsiz, başarılı
+transferEkrani(banka, vadesiz, "TR91 0006 2001 1978 6457 8414 26",
+               "Ayşe Demir", 250000, "Kira - Temmuz", "05.07.2026")
+
+# 4) Başka bankaya EFT — ücret uygulanır
+transferEkrani(banka, vadesiz, "TR56 0011 1000 0000 0102 0304 05",
+               "Mehmet Kaya (X Bank)", 120000, "Borç ödemesi", "05.07.2026")
+
+# 5) Yetersiz bakiye — tutar günlük limitin ALTINDA, yoksa limit kuralı
+#    önce tetiklenir ve bu senaryo bakiyeyi hiç sınamaz.
+transferEkrani(banka, vadesiz, "TR91 0006 2001 1978 6457 8414 26",
+               "Ayşe Demir", 4500000, "Araba peşinatı", "06.07.2026")
+
+# 6) Kontrol basamağı tutmayan IBAN — bir hane değiştirildi
+transferEkrani(banka, vadesiz, "TR91 0006 2001 1978 6457 8414 27",
+               "Ayşe Demir", 100000, "Test", "06.07.2026")
+
+# 7) Günlük limit — bakiye yeterli, limit değil
+transferEkrani(banka, birikim, "TR56 0011 1000 0000 0102 0304 05",
+               "Mehmet Kaya (X Bank)", 6000000, "Ev peşinatı", "06.07.2026")
+
+# 8) Para birimi uyuşmazlığı
+transferEkrani(banka, vadesiz, "TR26 0006 1005 1978 6457 8413 55",
+               "Kendi döviz hesabım", 100000, "Dolar alımı", "06.07.2026")
+
+# 9) Ekstre
+ekstre(vadesiz, "Vadesiz Hesap")
+
+# 10) Birikim projeksiyonu
+faizProjeksiyonu(birikim, 0.415, 5)

@@ -178,9 +178,9 @@
     },
 
     "builtin": {
-      "comment": "SPEC 7.2 prelude - available without use",
+      "comment": "SPEC 7.2 prelude - available without import",
       "name": "support.function.builtin.raidenscript",
-      "match": "\\b(print|len|type|range|assert|Error)\\b(?=\\s*\\()"
+      "match": "\\b(print|len|type|range|assert|int|float|str|bool|Error)\\b(?=\\s*\\()"
     },
 
     "type-annotation": {
