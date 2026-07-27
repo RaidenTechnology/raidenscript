@@ -575,3 +575,125 @@ de üretilir. Deyim sonu ayrıca `;` ve `}` önü olarak kabul edilir (tek satı
 Faz 1 / adım 5-6: **resolver + yorumlayıcı**. Kapsam zinciri, isim çözümleme,
 kapanış upvalue'ları; sonra ağaç yürüyen değerlendirici.
 Ondan sonra `rs run examples/01-temeller.rai` gerçekten çalışacak.
+
+---
+
+## 26 Temmuz 2026 — Faz 1 / adım 5-6-7: FAZ 1 TAMAMLANDI
+
+> ⚠️ **Bu üç adımın kaydı sonradan, 27 Temmuz'da commit geçmişinden yazıldı.**
+> O oturumlarda alınan kararlar ve karşılaşılan tuzaklar burada eksik olabilir;
+> hatırlananlar eklenmeli. Aşağıdakiler koddan ve commit'lerden doğrulanabilir olanlar.
+
+| Adım | Commit | Boyut | Sonuç |
+|---|---|---|---|
+| 5 — resolver | `cfeb7bd` | +654 satır | 15/15 örnek temiz, 1.044 isim çözüldü |
+| 6 — yorumlayıcı | `7243d6a` | +1.870 satır | `rs run` çalışıyor, 10/10 çalışabilir örnek |
+| 7 — REPL | `548e96a` | +221 satır | Faz 1 tamamlandı |
+
+### Yazılanlar
+
+| Dosya | İş |
+|---|---|
+| `src/resolver.hpp/.cpp` | Kapsam zinciri, isim çözümleme, prelude denetimi (387+109 satır) |
+| `src/value.hpp/.cpp` | Çalışma zamanı değer modeli — variant tabanlı (167+133 satır) |
+| `src/interp.hpp/.cpp` | Ağaç yürüyen değerlendirici, std modülleri, yerleşikler (1.197+111 satır) |
+| `src/repl.hpp/.cpp` | Etkileşimli kabuk (81+30 satır) |
+
+Faz 1 sonu toplam: **5.175 satır C++20**, sıfır derleyici uyarısı.
+
+### Koddan okunabilen kararlar
+
+- **Prelude 10 isimle sabitlendi** (`resolver.cpp`): `print`, `len`, `type`, `int`,
+  `float`, `str`, `bool`, `range`, `assert`, `Error`. Bu listeye girmeyen her şey
+  `import std.*` ister.
+- **Tanımsız isim hata değil uyarı.** Resolver bilmediği bir adı `Host` olarak işaretleyip
+  *"host tarafından sağlandığı varsayılıyor; yazım hatası değilse sorun yok"* diyor.
+  Gömülebilir dilde doğru varsayılan bu — 5 örnek (`game`, `sys`, `mc`, `serial`,
+  `sunucu`) tam olarak bu yüzden ayrıştırılıyor ama çalışmıyor.
+- **Bilinmeyen std modülü de uyarı**, nil olarak tanımlanıyor — Faz 2/3'te dolacak.
+
+### 🐛 REPL'in ilk gün yakaladığı hata
+
+`Source::fromFile` UTF-8 BOM'unu atlıyordu ama **yapıcı atlamıyordu**. REPL, bellekteki
+bir metinden `Source` kuran ilk kod yolu olduğu için borulanan girdide BOM doğrudan
+lexer'a gidiyor ve ilk tanımlayıcıya yapışıyordu. Görünmez bir hata; yeni bir giriş
+noktası, hiçbir gözle taramanın bulamayacağı şeyi buldu.
+
+---
+
+## 27 Temmuz 2026 — Dilin ilk tasarım değişikliği: `use` → `import` + `include`
+
+**Dönüm noktası:** Faz 1 bittikten sonraki ilk gerçek dil kararı. Fikir kullanıcıdan geldi:
+donanım ve yazılım bağımlılıkları ayrı kelimelerle yazılsın.
+
+### Karar ve gerekçesi
+
+İlk hâliyle fikir zayıftı: iki kelime aynı işi yaparsa (`include serial` ile
+`import math` arasında derleyici için fark yoksa) hiçbir şey beni `include math`
+yazmaktan alıkoymaz. **Derleyicinin doğrulayamadığı kılavuz, kılavuz değildir.**
+
+Güçlü hâli, farkı *ne getirdiği* yerine **ne zaman çözüldüğü** üzerine kurmak oldu:
+
+| | `import` | `include` |
+|---|---|---|
+| Çözülme anı | çalışma zamanı | derleme / gömme anı |
+| Kaynak | `std.*`, git reposu, `@ sürüm` | host'un derlemeye kattığı statik bağlayıcı |
+| Tırnaklı yol | serbest | yasak |
+| `@ sürüm` | serbest | yasak |
+
+Böylece kural **uygulanabilir** oldu: ESP32'de repo çözecek çalışma zamanı yok, o yüzden
+`include` tırnaklı yol ve sürüm etiketi kabul etmiyor. Donanım/yazılım ayrımı yan ürün.
+
+**Köprü kalıbı (kullanıcının ikinci katkısı):** bir dosya ikisini birden içerebilir ve
+asıl kullanım budur. Donanımı uygulamaya bağlayan dosya `include serial` + `import std.json`
+şeklinde görünür; okuyan kişi ilk beş satırda "bu kod donanıma dokunuyor **ve** ağa çıkıyor"
+diyebilir. `13-iha-telemetri.rai` bunun canlı örneği oldu.
+
+### İki tur
+
+**Tur 1 (`9c913fd`) — saf yeniden adlandırma.** `KwUse`→`KwImport`, `UseStmt`→`ImportStmt`.
+Yeni davranış yok. Ayrı tur olmasının sebebi: bir şey bozulduğunda hangisinin bozduğu
+belli olsun.
+
+**Tur 2 (`44ec25d`) — `include`.** Yeni anahtar kelime, iki reddetme, isim çakışması
+kontrolü, `13-iha-telemetri.rai`'ye köprü örneği.
+
+### 🐛 Yeniden adlandırmanın öğrettikleri
+
+- **Türkçe yerel ayar tuzağı.** Toplu değiştirme `Kwimport`'u büyütürken `KwİMPORT`
+  üretti — Türkçede `i`'nin büyüğü `I` değil `İ` (U+0130). C++ tarafında sadece
+  derlenmeyen bir karakter. Dilin lexer'ı UTF-8 tanımlayıcıları destekliyor ama
+  derleyicisinin kaynağı desteklemiyor; toplu değiştirmede **büyük/küçük harf duyarlı**
+  seçeneği şart.
+- **Bayrak yanlış yerde sessizce yanlış davranır.** `isInclude` ataması önce
+  `if (check(Tok::Str))` dalının içine düşmüştü; `include serial` için hiç kurulmuyor,
+  yani `include` sessizce `import` gibi davranıyordu. Derleyici bunu yakalayamaz.
+- **Derleyicinin göremediği dört yer:** AST dökümündeki `"use std"` etiketleri, iki
+  kaynak yorumu ve bir örnek yorumu. Yeniden adlandırmada string'ler ve yorumlar
+  ayrı bir tarama ister.
+
+### İki sapma (plan dışı ama gerekli)
+
+1. `include serial` std kütüphanesine gidip *"henüz uygulanmadı"* diyordu. `include`
+   tanımı gereği std'den çözülmez — host sağlar. Uyarı ayrıldı:
+   *"host bağlayıcısı henüz yok, statik bağlayıcılar Faz 4'te gelecek"*.
+2. AST dökümü `include serial`'ı `import std serial` diye gösteriyordu; yeni özelliğin
+   hata ayıklama görünümü onu ayırt edemiyordu.
+
+### Doğrulama
+
+- Sıfır derleyici uyarısı (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion`)
+- **10/10 çalışabilir örnek** geçiyor, 5'i host bağlayıcısı bekliyor (değişmedi)
+- Üç hata yolu da konum + kaynak satırı + ok işareti + ipucu ile raporlanıyor:
+  `include` tırnaklı yol, `include` sürüm etiketi, aynı adın iki kez bağlanması
+- `import` anahtar kelime olarak taranıyor; eski `use` artık sıradan tanımlayıcı
+- Anahtar kelime tablosu 33 giriş = **29 anahtar kelime + 4 operatör**
+
+**Anahtar kelime bütçesi: 28 → 29. Tavan 30, geriye bir boşluk kaldı.**
+
+### Sırada
+
+Minimal Faz 4: C API + emscripten ile WASM, `game.*` bağlayıcısı, STAR BREAKER'da
+RaidenScript ile tanımlanmış tek bir silah. Faz 2 (tipler) ve Faz 3 (bytecode VM)
+kasıtlı olarak atlanıyor — ağaç yürüyen yorumlayıcı olay tabanlı mod betikleri için
+fazlasıyla hızlı.
