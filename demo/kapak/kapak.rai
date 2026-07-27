@@ -1,0 +1,217 @@
+# RaidenScript cover generator.
+#
+# Every pixel of the cover image is computed by this program. It prints a plain
+# PPM (P3) image to stdout:
+#
+#     rai demo/kapak/kapak.rai > kapak.ppm
+#
+# There is no graphics library here and none in the language. What makes this
+# possible is what makes RaidenScript itself possible: numbers, strings, lists
+# and loops. The 5x7 font below is data in this file, not a system font.
+#
+# NOTE ON STRINGS: rows are collected in a list and joined once. Writing
+# `row = row + pixel` would be quadratic -- measured 7.3x slower at 12k pieces.
+
+W = 630
+H = 500
+
+
+# ============================================================
+#  COLOUR
+# ============================================================
+
+fn kirp(x: int) -> int:
+    if x < 0:
+        return 0
+    if x > 255:
+        return 255
+    return x
+
+# Squared distance to a point given in 0..1 space, scaled back to pixels.
+fn uzaklikKare(x: int, y: int, nx, ny) -> int:
+    dx = x - int(nx * W)
+    dy = y - int(ny * H)
+    return dx * dx + dy * dy
+
+# Radial glow: full strength at the centre, zero past `yaricap`.
+fn parlama(x: int, y: int, nx, ny, yaricap: int, guc) -> f64:
+    d2 = uzaklikKare(x, y, nx, ny)
+    r2 = yaricap * yaricap
+    if d2 >= r2:
+        return 0.0
+    t = 1.0 - (d2 / r2)
+    return t * t * guc
+
+
+# ============================================================
+#  5x7 BITMAP FONT  (data, not a system font)
+# ============================================================
+
+FONT = {
+    "A": ["01110","10001","10001","11111","10001","10001","10001"],
+    "C": ["01110","10001","10000","10000","10000","10001","01110"],
+    "D": ["11110","10001","10001","10001","10001","10001","11110"],
+    "E": ["11111","10000","10000","11110","10000","10000","11111"],
+    "H": ["10001","10001","10001","11111","10001","10001","10001"],
+    "I": ["11111","00100","00100","00100","00100","00100","11111"],
+    "M": ["10001","11011","10101","10101","10001","10001","10001"],
+    "N": ["10001","11001","10101","10011","10001","10001","10001"],
+    "O": ["01110","10001","10001","10001","10001","10001","01110"],
+    "P": ["11110","10001","10001","11110","10000","10000","10000"],
+    "R": ["11110","10001","10001","11110","10100","10010","10001"],
+    "S": ["01111","10000","10000","01110","00001","00001","11110"],
+    "T": ["11111","00100","00100","00100","00100","00100","00100"],
+    "V": ["10001","10001","10001","10001","10001","01010","00100"],
+    "J": ["00111","00010","00010","00010","00010","10010","01100"],
+    "W": ["10001","10001","10001","10101","10101","11011","10001"],
+    "B": ["11110","10001","10001","11110","10001","10001","11110"],
+    "L": ["10000","10000","10000","10000","10000","10000","11111"],
+    "U": ["10001","10001","10001","10001","10001","10001","01110"],
+    "0": ["01110","10011","10101","10101","10101","11001","01110"],
+    "1": ["00100","01100","00100","00100","00100","00100","01110"],
+    "3": ["11110","00001","00001","01110","00001","00001","11110"],
+    ".": ["00000","00000","00000","00000","00000","01100","01100"],
+    "-": ["00000","00000","00000","11111","00000","00000","00000"],
+    " ": ["00000","00000","00000","00000","00000","00000","00000"],
+}
+
+fn glif(k: str) -> list:
+    for a in FONT.keys():
+        if a == k:
+            return FONT[k]
+    return FONT[" "]
+
+# Stamps text into `maske` (a flat 0/1 list, W*H) at the given scale.
+fn metinBas(maske: list, metin: str, bx: int, by: int, olcek: int):
+    i = 0
+    x = bx
+    while i < len(metin):
+        g = glif(metin[i])
+        sy = 0
+        while sy < 7:
+            satir = g[sy]
+            sx = 0
+            while sx < 5:
+                if satir[sx] == "1":
+                    py = 0
+                    while py < olcek:
+                        px = 0
+                        while px < olcek:
+                            ex = x + sx * olcek + px
+                            ey = by + sy * olcek + py
+                            if ex >= 0 and ex < W and ey >= 0 and ey < H:
+                                maske[ey * W + ex] = 1
+                            px = px + 1
+                        py = py + 1
+                sx = sx + 1
+            sy = sy + 1
+        x = x + 6 * olcek
+        i = i + 1
+    return 0
+
+
+# ============================================================
+#  THE BOLT
+# ============================================================
+#
+# Ray casting: a point is inside when a ray to the right crosses an odd number
+# of edges. Seven points, drawn once, scaled to the canvas.
+
+# The tail stops at 0.66 so it clears the wordmark; the first version ran the
+# spike straight through the letters.
+BOLT = [
+    [0.548, 0.120], [0.412, 0.430], [0.498, 0.430],
+    [0.450, 0.660], [0.622, 0.382], [0.534, 0.382], [0.604, 0.120],
+]
+
+fn boltIcinde(x: int, y: int) -> bool:
+    icinde = false
+    n = len(BOLT)
+    i = 0
+    j = n - 1
+    while i < n:
+        xi = BOLT[i][0] * W
+        yi = BOLT[i][1] * H
+        xj = BOLT[j][0] * W
+        yj = BOLT[j][1] * H
+        if (yi > y) != (yj > y):
+            kesim = xi + (y - yi) * (xj - xi) / (yj - yi)
+            if x < kesim:
+                icinde = not icinde
+        j = i
+        i = i + 1
+    return icinde
+
+
+# ============================================================
+#  RENDER
+# ============================================================
+
+fn kur():
+    n = W * H
+    yazi = []
+    i = 0
+    while i < n:
+        yazi.push(0)
+        i = i + 1
+
+    metinBas(yazi, "RAIDENSCRIPT", 96, 372, 5)
+    metinBas(yazi, "ONE INTERPRETER - THREE HOSTS", 96, 424, 2)
+    metinBas(yazi, "TERMINAL  WEB  JVM", 96, 448, 2)
+    return yazi
+
+fn ciz():
+    yazi = kur()
+
+    print("P3")
+    print(f"{W} {H}")
+    print("255")
+
+    y = 0
+    while y < H:
+        satir = []
+        x = 0
+        while x < W:
+            # base
+            r = 6
+            g = 7
+            b = 11
+
+            # mesh: turquoise upper-left, violet upper-right, turquoise low-centre
+            t1 = parlama(x, y, 0.16, 0.10, 340, 1.0)
+            t2 = parlama(x, y, 0.86, 0.06, 330, 1.0)
+            t3 = parlama(x, y, 0.60, 0.95, 300, 0.55)
+            r = r + int(t2 * 96 + t3 * 10)
+            g = g + int(t1 * 150 + t2 * 60 + t3 * 90)
+            b = b + int(t1 * 132 + t2 * 190 + t3 * 80)
+
+            # faint grid
+            if x % 42 == 0 or y % 42 == 0:
+                r = r + 7
+                g = g + 9
+                b = b + 12
+
+            # bolt: vertical gradient turquoise -> violet, with a bright rim
+            if boltIcinde(x, y):
+                k = y / H
+                r = kirp(int(40 + k * 90))
+                g = kirp(int(226 - k * 120))
+                b = kirp(int(200 + k * 55))
+                if boltIcinde(x - 3, y) == false or boltIcinde(x + 3, y) == false:
+                    r = kirp(r + 70)
+                    g = kirp(g + 40)
+                    b = kirp(b + 40)
+
+            # text sits on top of everything
+            if yazi[y * W + x] == 1:
+                r = 238
+                g = 241
+                b = 248
+
+            satir.push(f"{kirp(r)} {kirp(g)} {kirp(b)}")
+            x = x + 1
+        print(satir.join(" "))
+        y = y + 1
+    return 0
+
+ciz()
