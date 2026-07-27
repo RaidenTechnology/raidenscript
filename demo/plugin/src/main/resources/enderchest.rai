@@ -1,0 +1,165 @@
+# RAIDEN ENDER SANDIĞI — plugin'in TAMAMI.
+#
+# Bu dosyada olanlar: izin adları, bekleme süresi, her mesajın metni ve rengi,
+# ses ve parçacık seçimi, başkasının sandığına bakma kuralları, hedefin
+# bilgilendirilmesi, kullanım sayacı.
+#
+# Java'da olanlar: mc.* ilkelleri. "Şu oyuncuya şu metni yaz", "şu izni sorgula",
+# "ender sandığını aç". Tek bir kural orada değil.
+#
+# DÜZENLE VE ÇALIŞTIR: bu dosyayı değiştirip oyun içinde '/ec yenile' yaz.
+# Sunucuyu kapatmaya gerek yok — kurallar anında değişir.
+
+include mc
+
+
+# ============================================================
+#  AYARLAR
+# ============================================================
+
+BEKLEME = 5.0                              # saniye; 0 yaparsan bekleme kalkar
+
+IZIN_KULLAN     = "raiden.ec.kullan"
+IZIN_BASKASI    = "raiden.ec.baskasi"
+IZIN_BEKLEMESIZ = "raiden.ec.beklemesiz"
+
+ACILIS_SESI   = "block.ender_chest.open"
+RET_SESI      = "block.note_block.bass"
+PARCACIK      = "PORTAL"
+PARCACIK_ADET = 24
+
+# Başkasının sandığı açıldığında hedefe haber verilsin mi?
+HEDEFE_HABER_VER = true
+
+
+# ============================================================
+#  DURUM
+# ============================================================
+
+sonKullanim = {}          # uuid -> son açılış zamanı (saniye)
+acilisSayisi = 0
+
+
+# ============================================================
+#  YARDIMCILAR
+# ============================================================
+
+fn anahtarVar(harita, anahtar) -> bool:
+    for k in harita.keys():
+        if k == anahtar:
+            return true
+    return false
+
+fn izinli(uuid: str, izin: str) -> bool:
+    return mc.izinVar(uuid, izin) == 1
+
+# Kalan bekleme, saniye. 0 ise hazır.
+fn kalanBekleme(uuid: str) -> f64:
+    if BEKLEME <= 0.0 or izinli(uuid, IZIN_BEKLEMESIZ):
+        return 0.0
+    if not anahtarVar(sonKullanim, uuid):
+        return 0.0
+    gecen = mc.zaman() - sonKullanim[uuid]
+    if gecen >= BEKLEME:
+        return 0.0
+    return BEKLEME - gecen
+
+# Ekranda "2.4 sn" değil "3 sn" görünsün: yukarı yuvarlanmış tam saniye.
+fn saniyeYaz(kalan: f64) -> str:
+    tam = int(kalan)
+    if kalan > tam:
+        tam = tam + 1
+    return f"{tam}"
+
+fn ret(uuid: str, metin: str):
+    mc.mesaj(uuid, f"§c{metin}")
+    mc.ses(uuid, RET_SESI, 0.7, 0.8)
+    return 0
+
+fn acilisEfekti(uuid: str):
+    mc.ses(uuid, ACILIS_SESI, 0.8, 1.0)
+    mc.parcacik(uuid, PARCACIK, PARCACIK_ADET)
+    return 0
+
+
+# ============================================================
+#  KOMUT
+# ============================================================
+#
+# Java bağlamı ittirmiyor, betik ÇEKİYOR (capi.h deseni): rs_call yalnızca sayı
+# taşıdığı için oyuncu kimliği ve argümanlar mc.komut* ile alınıyor.
+
+fn komut():
+    uuid = mc.komutOyuncu()
+    if uuid == "":
+        return 0
+
+    if not izinli(uuid, IZIN_KULLAN):
+        return ret(uuid, "Ender sandığını açma yetkin yok.")
+
+    if int(mc.komutArgSayisi()) == 0:
+        return kendiSandigi(uuid)
+    return baskasininSandigi(uuid, mc.komutArg(0))
+
+
+fn kendiSandigi(uuid: str):
+    kalan = kalanBekleme(uuid)
+    if kalan > 0.0:
+        return ret(uuid, f"Biraz bekle — {saniyeYaz(kalan)} sn kaldı.")
+
+    if mc.enderAc(uuid, uuid) != 1:
+        return ret(uuid, "Sandık açılamadı.")
+
+    sonKullanim[uuid] = mc.zaman()
+    outer acilisSayisi = acilisSayisi + 1
+    acilisEfekti(uuid)
+    mc.mesaj(uuid, "§b§lEnder Sandığı §r§7açıldı.")
+
+    if acilisSayisi % 10 == 0:
+        mc.log(f"Ender sandığı {acilisSayisi} kez açıldı.")
+    return 0
+
+
+fn baskasininSandigi(uuid: str, hedefAdi: str):
+    if not izinli(uuid, IZIN_BASKASI):
+        return ret(uuid, "Başkasının sandığına bakma yetkin yok.")
+
+    hedef = mc.oyuncuBul(hedefAdi)
+    if hedef == "":
+        return ret(uuid, f"'{hedefAdi}' adında çevrimiçi bir oyuncu yok.")
+
+    if hedef == uuid:
+        # Kendi adını yazmak hata değil, sadece uzun yol.
+        return kendiSandigi(uuid)
+
+    kalan = kalanBekleme(uuid)
+    if kalan > 0.0:
+        return ret(uuid, f"Biraz bekle — {saniyeYaz(kalan)} sn kaldı.")
+
+    if mc.enderAc(uuid, hedef) != 1:
+        return ret(uuid, "Sandık açılamadı — oyuncu az önce çıkmış olabilir.")
+
+    sonKullanim[uuid] = mc.zaman()
+    outer acilisSayisi = acilisSayisi + 1
+    acilisEfekti(uuid)
+
+    hedefAd = mc.ad(hedef)
+    bakanAd = mc.ad(uuid)
+    mc.mesaj(uuid, f"§b§l{hedefAd} §r§7oyuncusunun ender sandığı açıldı.")
+
+    # Gizli gözetleme yok: hedef bilsin. Bu bir kural, ilkel değil — yeri burası.
+    if HEDEFE_HABER_VER:
+        mc.mesaj(hedef, f"§7{bakanAd} §8ender sandığına baktı.")
+
+    mc.log(f"{bakanAd} -> {hedefAd} ender sandığı")
+    return 0
+
+
+# ============================================================
+#  KURULUM
+# ============================================================
+
+fn kur():
+    bekleme = int(BEKLEME)
+    mc.log(f"Raiden Ender Sandığı kuralları hazır — bekleme {bekleme} sn")
+    return 0

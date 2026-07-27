@@ -100,6 +100,28 @@ $(WASM_OUT): $(WASM_SRC)
 	  -sENVIRONMENT=web,worker,node -sEXPORT_ES6=0
 	@echo "--> $@"
 
+# ---- JVM köprüsü (Faz 6) ----
+#
+# Tek bir DLL: hem yorumlayıcı hem JNI giriş noktaları. Ayrı .dll + .a ikilisi
+# kurmuyoruz, çünkü plugin jar'ının içine tek dosya koymak istiyoruz.
+# -static-libgcc/-static-libstdc++ ŞART: yoksa DLL, w64devkit'in çalışma zamanı
+# DLL'lerini arar ve sunucuda "kütüphane bulunamadı" ile düşer.
+
+JDK_HOME ?= $(HOME)/Plugins/mc-sword/.tools/jdk-21.0.11+10
+JNI_SRC  := $(filter-out $(SRC_DIR)/main.cpp,$(SOURCES))
+JNI_OUT  := $(WASM_DIR)/raidenscript.dll
+
+.PHONY: jni
+
+jni: $(JNI_OUT)
+
+$(JNI_OUT): bindings/jvm/rs_jni.cpp $(JNI_SRC)
+	@mkdir -p $(WASM_DIR)
+	$(CXX) -std=c++20 -O2 -shared -o $@ $^ \
+	  -I"$(JDK_HOME)/include" -I"$(JDK_HOME)/include/win32" \
+	  -static-libgcc -static-libstdc++
+	@echo "--> $@"
+
 lib: $(LIB)
 
 $(LIB): $(LIB_OBJECTS)

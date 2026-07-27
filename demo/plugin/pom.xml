@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.raiden</groupId>
+  <artifactId>raiden-enderchest</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>RaidenEnderChest</name>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>papermc</id>
+      <url>https://repo.papermc.io/repository/maven-public/</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.papermc.paper</groupId>
+      <artifactId>paper-api</artifactId>
+      <version>1.21-R0.1-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>RaidenEnderChest</finalName>
+    <resources>
+      <!-- plugin.yml + enderchest.rai -->
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+      </resource>
+      <!-- Yerel kütüphane jar'ın içine gömülüyor; plugin açılışta çıkarıp yüklüyor.
+           Böylece sunucuya elle DLL kopyalamak gerekmiyor. -->
+      <resource>
+        <directory>../../dist</directory>
+        <includes><include>raidenscript.dll</include></includes>
+        <targetPath>yerel</targetPath>
+        <filtering>false</filtering>
+      </resource>
+      <!-- Köprünün Java yüzü ayrı bir modül değil; kaynağı doğrudan derleniyor. -->
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <id>kopru-kaynagi</id>
+            <phase>generate-sources</phase>
+            <goals><goal>add-source</goal></goals>
+            <configuration>
+              <sources><source>../../bindings/jvm/java</source></sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

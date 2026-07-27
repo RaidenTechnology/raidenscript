@@ -8,3 +8,5 @@ dist/
 .vscode/
 *.vsix
 devlog-*.txt
+
+demo/plugin/target/

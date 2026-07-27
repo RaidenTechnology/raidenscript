@@ -315,6 +315,27 @@ yerine tip adı basılıyor. `throw Error("tutar girilmedi")` yazan bir betikte 
 metin host'a hiç ulaşmıyor. `interp.cpp`'de istisna dışarı verilirken `message`
 alanı tanıya eklenmeli; tanı altyapısı zaten hazır olduğu için küçük bir iş.
 
+### 🔴 H6 — Özyineleme JVM'i SESSİZCE öldürüyor (Faz 6 engelleyicisi)
+
+Aynı yığın sorununun üçüncü yüzü, ve en kötüsü. JNI köprüsünde ölçüldü:
+
+| Ortam | Güvenli derinlik | Aşınca |
+|---|---|---|
+| native `rs.exe` (8 MB) | ~1.000 | sessiz ölüm, rc=127 |
+| wasm (`-sSTACK_SIZE=8MB`) | ~1.000 | temiz `Maximum call stack size exceeded` |
+| **JVM, varsayılan (1 MB)** | **~500** | **süreç ölüyor: Java istisnası YOK, `hs_err` YOK, rc=127** |
+| JVM, `-Xss16m` | ~5.000 | aynı sessiz ölüm |
+
+Tarayıcıda bir sekme ölür. Minecraft sunucusunda **tüm sunucu** ölür ve
+günlükte tek satır iz kalmaz — 20 oyuncu düşer, kimse sebebini bilmez.
+
+Betik karesi başına yaklaşık **1,7 KB yerel yığın** harcanıyor (1 MB ÷ ~600).
+
+**Bu, iş listesindeki 3. maddeyi (özyineleme derinliği sayacı) "iyi olurdu"dan
+"Faz 6 için ŞART"a taşıyor.** Yorumlayıcıya bir derinlik sayacı (öneri: 4.000)
+ve aşıldığında normal, yakalanabilir bir `Error` gerekiyor. Geçici önlem sunucuyu
+`-Xss16m` ile başlatmak — sınırı öteler, kaldırmaz.
+
 ### 📐 Sınırda daraltma kuralı (belgelenecek, hata değil)
 
 `rs_host_fn` sayıları `double` taşıyor (capi.h). Olay geri çağrılarında gelen
