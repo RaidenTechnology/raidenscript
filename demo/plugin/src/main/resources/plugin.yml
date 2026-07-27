@@ -1,26 +1,36 @@
-name: RaidenEnderChest
+name: RaidenSistem
 version: 1.0.0
-main: com.raiden.ec.EnderChestPlugin
+main: com.raiden.sistem.SistemPlugin
 api-version: '1.21'
 author: Raiden Technology
-description: Kuralları RaidenScript ile yazılmış ender sandığı plugin'i.
+description: Sunucu sistemlerinin kural katmani RaidenScript ile yazildi (sistem.rai).
 
 commands:
   ec:
-    description: Ender sandığını açar. '/ec <oyuncu>' başkasınınkini, '/ec yenile' kuralları yeniden yükler.
-    usage: /ec [oyuncu|yenile]
+    description: Ender sandigini acar. '/ec <oyuncu>' baskasininkini acar.
+    usage: /ec [oyuncu]
     aliases: [endersandik, esandik]
+  buyu:
+    description: Buyu masasini acar.
+    usage: /buyu
+    aliases: [buyumasasi]
+  rai:
+    description: RaidenScript kurallarini yeniden yukler.
+    usage: /rai yenile
 
 permissions:
   raiden.ec.kullan:
-    description: Kendi ender sandığını açabilir.
+    description: Kendi ender sandigini acabilir.
     default: true
   raiden.ec.baskasi:
-    description: Başka oyuncunun ender sandığını açabilir.
+    description: Baska oyuncunun ender sandigini acabilir.
     default: op
   raiden.ec.beklemesiz:
-    description: Bekleme süresinden muaf.
+    description: Ender sandigi bekleme suresinden muaf.
     default: op
-  raiden.ec.yonet:
-    description: '/ec yenile kullanabilir.'
+  raiden.buyu.kullan:
+    description: Buyu masasini acabilir.
+    default: true
+  raiden.rai.yonet:
+    description: '/rai yenile kullanabilir.'
     default: op

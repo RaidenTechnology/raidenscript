@@ -1,11 +1,13 @@
-package com.raiden.buyu;
+package com.raiden.sistem;
 
 import com.raiden.rs.RaidenScript;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -22,41 +24,52 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * mc.* bağlayıcısı — büyü masasının Minecraft yüzü.
+ * mc.* bağlayıcısı — RaidenScript'in Minecraft yüzü.
  *
- * Burada BÜYÜ YOK. Hangi büyü var, ne yapar, kaç seviye çıkar, kaça mal olur,
- * hangisi hangisiyle çakışır, hangi nadirlik kaç yuva verir — hiçbiri burada.
- * Hepsi buyu.rai içinde. Buradaki her fonksiyon bir ilkel: "sandık arayüzü aç",
- * "şu yuvaya şu eşyayı koy", "giriş eşyasına şu statı ekle".
+ * Burada SİSTEM YOK. Hangi büyü var, bekleme kaç saniye, hangi izin ne yapar,
+ * hangi mesaj ne yazar — hiçbiri burada. Hepsi sistem.rai içinde. Buradaki her
+ * fonksiyon bir ilkel: "sandık arayüzü aç", "şu yuvaya şu eşyayı koy", "ender
+ * sandığını aç", "giriş eşyasına şu statı ekle", "XP düş".
  *
- * ENTEGRASYON: statlar raiden-combatstats'ın kullandığı ŞEMAYA yazılıyor —
- * namespace "raidenrpg", anahtar "rpg_stat_<stat>" (DOUBLE). Böylece mevcut
- * plugin'lerin tek satırı değişmeden büyüler savaş formülüne giriyor.
+ * Sınama, banka ve mağaza demolarındakiyle aynı: bu sınıfın gövdelerini konsola
+ * yazan sürümlerle değiştir, betik değişmeden çalışsın.
+ *
+ * ENTEGRASYON: statlar raiden-combatstats'ın kullandığı ŞEMAYA yazılıyor --
+ * namespace "raidenrpg", anahtar "rpg_stat_<stat>" (DOUBLE), DELTA olarak.
+ * Böylece mevcut plugin'lerin tek satırı değişmeden büyüler savaş formülüne
+ * giriyor ve eşyanın kendi temel statı ezilmiyor.
+ *
+ * SINIR: capi.h yalnızca sayı ve dize taşıyor, nesne taşımıyor. Oyuncu kimliği
+ * bu yüzden UUID dizesi. Betiğe dize ARGÜMANI da geçilemiyor (rs_call sadece
+ * double alıyor), o yüzden komut bağlamını betik ÇEKİYOR: mc.komutAdi(),
+ * mc.komutOyuncu(), mc.komutArg(0).
  */
-public final class BuyuBaglayici {
+public final class McBaglayici {
 
     /** raiden-combatstats/RpgKeys ile AYNI olmak zorunda. */
     private static final String RPG_NS = "raidenrpg";
     private static final String BUYU_ONEK = "rai_buyu_";
 
-    /** raiden-combatstats/Rarity'deki görünen adlar, en düşükten en yükseğe. */
+    /** raiden-combatstats/Rarity'deki görünen adlar. */
     private static final String[] NADIRLIKLER =
             { "Sıradan", "Seyrek", "Nadir", "Epik", "Efsanevi", "Mistik", "Eşsiz" };
+
+    /** Büyü masasındaki giriş yuvası. Betik de bu sayıyı mc.girisYuvasi ile alıyor. */
+    public static final int GIRIS_YUVASI = 13;
 
     private final Plugin plugin;
     private final Map<UUID, Inventory> acikMasalar = new HashMap<>();
 
-    /** Giriş eşyasının durduğu yuva. Betik de bu sayıyı biliyor (mc.girisYuvasi). */
-    public static final int GIRIS_YUVASI = 13;
-
     private UUID komutOyuncu;
+    private String komutAdi = "";
     private String[] komutArgs = new String[0];
     private int sonTiklananYuva = -1;
 
-    public BuyuBaglayici(Plugin plugin) { this.plugin = plugin; }
+    public McBaglayici(Plugin plugin) { this.plugin = plugin; }
 
-    public void baglamKur(UUID oyuncu, String[] args) {
+    public void baglamKur(UUID oyuncu, String komut, String[] args) {
         this.komutOyuncu = oyuncu;
+        this.komutAdi = komut;
         this.komutArgs = args;
     }
 
@@ -91,11 +104,15 @@ public final class BuyuBaglayici {
         return k;
     }
 
+    private static Component bilesen(String legacy) {
+        return LegacyComponentSerializer.legacySection().deserialize(legacy)
+                .decoration(TextDecoration.ITALIC, false);
+    }
+
     private static String duzMetin(Component c) {
         return LegacyComponentSerializer.legacySection().serialize(c);
     }
 
-    /** § kodlarını temizler — nadirlik satırını eşleştirmek için. */
     private static String renksiz(String s) {
         return s.replaceAll("§[0-9a-fk-orA-FK-OR]", "");
     }
@@ -104,6 +121,7 @@ public final class BuyuBaglayici {
         Map<String, RaidenScript.HostFn> m = new HashMap<>();
 
         // ---------------- komut bağlamı (betik çeker) ----------------
+        m.put("komutAdi", a -> komutAdi);
         m.put("komutOyuncu", a -> komutOyuncu == null ? "" : komutOyuncu.toString());
         m.put("komutArgSayisi", a -> (double) komutArgs.length);
         m.put("komutArg", a -> {
@@ -115,21 +133,18 @@ public final class BuyuBaglayici {
 
         // ---------------- oyuncu ----------------
         m.put("ad", a -> { Player p = oyuncu(RaidenScript.metin(a, 0)); return p == null ? "" : p.getName(); });
-        m.put("mesaj", a -> {
-            Player p = oyuncu(RaidenScript.metin(a, 0));
-            if (p != null) p.sendMessage(LegacyComponentSerializer.legacySection()
-                    .deserialize(RaidenScript.metin(a, 1)));
-            return 0.0;
+        m.put("oyuncuBul", a -> {
+            Player p = Bukkit.getPlayerExact(RaidenScript.metin(a, 0));
+            return p == null ? "" : p.getUniqueId().toString();
         });
+        m.put("cevrimici", a -> oyuncu(RaidenScript.metin(a, 0)) != null ? 1.0 : 0.0);
         m.put("izinVar", a -> {
             Player p = oyuncu(RaidenScript.metin(a, 0));
             return (p != null && p.hasPermission(RaidenScript.metin(a, 1))) ? 1.0 : 0.0;
         });
-        m.put("ses", a -> {
+        m.put("mesaj", a -> {
             Player p = oyuncu(RaidenScript.metin(a, 0));
-            if (p == null) return 0.0;
-            p.playSound(p.getLocation(), RaidenScript.metin(a, 1),
-                        (float) RaidenScript.sayi(a, 2), (float) RaidenScript.sayi(a, 3));
+            if (p != null) p.sendMessage(bilesen(RaidenScript.metin(a, 1)));
             return 0.0;
         });
         m.put("xpSeviye", a -> { Player p = oyuncu(RaidenScript.metin(a, 0)); return p == null ? 0.0 : p.getLevel(); });
@@ -140,6 +155,37 @@ public final class BuyuBaglayici {
             p.setLevel(p.getLevel() - n);
             return 1.0;
         });
+
+        // ---------------- dünya ----------------
+        m.put("enderAc", a -> {
+            Player izleyen = oyuncu(RaidenScript.metin(a, 0));
+            Player hedef = oyuncu(RaidenScript.metin(a, 1));
+            if (izleyen == null || hedef == null) return 0.0;
+            izleyen.openInventory(hedef.getEnderChest());
+            return 1.0;
+        });
+        m.put("ses", a -> {
+            Player p = oyuncu(RaidenScript.metin(a, 0));
+            if (p == null) return 0.0;
+            p.playSound(p.getLocation(), RaidenScript.metin(a, 1),
+                        (float) RaidenScript.sayi(a, 2), (float) RaidenScript.sayi(a, 3));
+            return 0.0;
+        });
+        m.put("parcacik", a -> {
+            Player p = oyuncu(RaidenScript.metin(a, 0));
+            if (p == null) return 0.0;
+            Particle tur;
+            try {
+                tur = Particle.valueOf(RaidenScript.metin(a, 1).toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning("mc.parcacik: bilinmeyen parçacık -> " + RaidenScript.metin(a, 1));
+                return 0.0;
+            }
+            p.getWorld().spawnParticle(tur, p.getLocation().add(0, 1, 0),
+                                       RaidenScript.tam(a, 2), 0.4, 0.6, 0.4, 0.02);
+            return 0.0;
+        });
+        m.put("zaman", a -> System.currentTimeMillis() / 1000.0);
         m.put("log", a -> { plugin.getLogger().info(RaidenScript.metin(a, 0)); return 0.0; });
 
         // ---------------- arayüz ----------------
@@ -148,7 +194,7 @@ public final class BuyuBaglayici {
             if (p == null) return 0.0;
             int satir = Math.max(1, Math.min(6, RaidenScript.tam(a, 2)));
             Inventory inv = Bukkit.createInventory(new MasaSahibi(), satir * 9,
-                    LegacyComponentSerializer.legacySection().deserialize(RaidenScript.metin(a, 1)));
+                    bilesen(RaidenScript.metin(a, 1)));
             acikMasalar.put(p.getUniqueId(), inv);
             p.openInventory(inv);
             return 1.0;
@@ -160,17 +206,13 @@ public final class BuyuBaglayici {
             if (yuva < 0 || yuva >= inv.getSize()) return 0.0;
             Material mat = Material.matchMaterial(RaidenScript.metin(a, 2).toUpperCase(Locale.ROOT));
             if (mat == null) {
-                // Betikteki yazım hatası sessizce boş yuvaya dönüşmesin.
                 plugin.getLogger().warning("mc.guiEsya: bilinmeyen materyal -> " + RaidenScript.metin(a, 2));
                 return 0.0;
             }
             ItemStack it = new ItemStack(mat, Math.max(1, Math.min(64, RaidenScript.tam(a, 4))));
             ItemMeta meta = it.getItemMeta();
             String ad = RaidenScript.metin(a, 3);
-            if (!ad.isEmpty()) {
-                meta.displayName(LegacyComponentSerializer.legacySection().deserialize(ad)
-                        .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
-            }
+            if (!ad.isEmpty()) meta.displayName(bilesen(ad));
             it.setItemMeta(meta);
             inv.setItem(yuva, it);
             return 1.0;
@@ -178,13 +220,11 @@ public final class BuyuBaglayici {
         m.put("guiLore", a -> {
             Inventory inv = masa(RaidenScript.metin(a, 0));
             if (inv == null) return 0.0;
-            int yuva = RaidenScript.tam(a, 1);
-            ItemStack it = inv.getItem(yuva);
+            ItemStack it = inv.getItem(RaidenScript.tam(a, 1));
             if (it == null) return 0.0;
             ItemMeta meta = it.getItemMeta();
             List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
-            lore.add(LegacyComponentSerializer.legacySection().deserialize(RaidenScript.metin(a, 2))
-                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            lore.add(bilesen(RaidenScript.metin(a, 2)));
             meta.lore(lore);
             it.setItemMeta(meta);
             return 1.0;
@@ -204,27 +244,23 @@ public final class BuyuBaglayici {
             ItemStack it = giris(RaidenScript.metin(a, 0));
             if (it == null) return "";
             ItemMeta meta = it.getItemMeta();
-            return (meta != null && meta.displayName() != null)
-                    ? duzMetin(meta.displayName())
-                    : it.getType().name();
+            return (meta != null && meta.displayName() != null) ? duzMetin(meta.displayName()) : it.getType().name();
         });
         m.put("girisMateryal", a -> {
             ItemStack it = giris(RaidenScript.metin(a, 0));
             return it == null ? "" : it.getType().name();
         });
-        // "silah" | "zirh" | "diger" -- tür kararı burada değil, sadece ham sınıflama.
         m.put("girisTur", a -> {
             ItemStack it = giris(RaidenScript.metin(a, 0));
             if (it == null) return "";
             String t = it.getType().name();
             if (t.endsWith("_SWORD") || t.endsWith("_AXE") || t.equals("TRIDENT")
-                || t.equals("BOW") || t.equals("CROSSBOW") || t.endsWith("_HOE")) return "silah";
+                || t.equals("BOW") || t.equals("CROSSBOW")) return "silah";
             if (t.endsWith("_HELMET") || t.endsWith("_CHESTPLATE")
                 || t.endsWith("_LEGGINGS") || t.endsWith("_BOOTS")) return "zirh";
             return "diger";
         });
-        /* Nadirlik lore'un son satırında duruyor (raiden-combatstats/Rarity: "display
-         * name is appended to the bottom of every item's lore"). Renk kodları
+        /* Nadirlik lore'un son satırında (raiden-combatstats/Rarity). Renk kodları
          * temizlenip bilinen adlarla eşleştiriliyor; eşleşme yoksa "" dönüyor ve
          * kararı betik veriyor. */
         m.put("girisNadirlik", a -> {
@@ -235,7 +271,7 @@ public final class BuyuBaglayici {
             for (int i = lore.size() - 1; i >= 0; i--) {
                 String satir = renksiz(duzMetin(lore.get(i))).trim();
                 for (String n : NADIRLIKLER) {
-                    if (satir.contains(n.toUpperCase(new Locale("tr"))) || satir.contains(n)) return n;
+                    if (satir.contains(n) || satir.contains(n.toUpperCase(new Locale("tr")))) return n;
                 }
             }
             return "";
@@ -251,10 +287,9 @@ public final class BuyuBaglayici {
             ItemStack it = giris(RaidenScript.metin(a, 0));
             if (it == null || !it.hasItemMeta()) return 0.0;
             PersistentDataContainer pdc = it.getItemMeta().getPersistentDataContainer();
-            long n = pdc.getKeys().stream()
+            return (double) pdc.getKeys().stream()
                     .filter(k -> k.getNamespace().equals(RPG_NS) && k.getKey().startsWith(BUYU_ONEK))
                     .count();
-            return (double) n;
         });
         m.put("girisBuyuYaz", a -> {
             ItemStack it = giris(RaidenScript.metin(a, 0));
@@ -265,18 +300,15 @@ public final class BuyuBaglayici {
             it.setItemMeta(meta);
             return 1.0;
         });
-        /* Stat DELTA'sı ekleniyor, mutlak değer değil: silahın kendi temel statını
-         * ezmemek için. raiden-combatstats aynı anahtarı okuyor. */
         m.put("girisStatEkle", a -> {
             ItemStack it = giris(RaidenScript.metin(a, 0));
             if (it == null) return 0.0;
             String stat = RaidenScript.metin(a, 1).toLowerCase(Locale.ROOT);
-            double delta = RaidenScript.sayi(a, 2);
             ItemMeta meta = it.getItemMeta();
             NamespacedKey k = anahtar("rpg_stat_" + stat);
             Double eski = meta.getPersistentDataContainer().get(k, PersistentDataType.DOUBLE);
             meta.getPersistentDataContainer().set(k, PersistentDataType.DOUBLE,
-                    (eski == null ? 0.0 : eski) + delta);
+                    (eski == null ? 0.0 : eski) + RaidenScript.sayi(a, 2));
             it.setItemMeta(meta);
             return 1.0;
         });
@@ -285,14 +317,11 @@ public final class BuyuBaglayici {
             if (it == null) return 0.0;
             ItemMeta meta = it.getItemMeta();
             List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
-            lore.add(LegacyComponentSerializer.legacySection().deserialize(RaidenScript.metin(a, 1))
-                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            lore.add(bilesen(RaidenScript.metin(a, 1)));
             meta.lore(lore);
             it.setItemMeta(meta);
             return 1.0;
         });
-        /* Belirli bir metni içeren lore satırını siler — büyü satırını
-         * yükseltirken eskisini temizlemek için. */
         m.put("girisLoreSil", a -> {
             ItemStack it = giris(RaidenScript.metin(a, 0));
             if (it == null || !it.hasItemMeta()) return 0.0;
@@ -318,6 +347,5 @@ public final class BuyuBaglayici {
     public static final class MasaSahibi implements org.bukkit.inventory.InventoryHolder {
         private Inventory inv;
         @Override public Inventory getInventory() { return inv; }
-        void setInventory(Inventory i) { this.inv = i; }
     }
 }

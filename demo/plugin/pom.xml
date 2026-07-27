@@ -5,10 +5,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.raiden</groupId>
-  <artifactId>raiden-enderchest</artifactId>
+  <artifactId>raiden-sistem</artifactId>
   <version>1.0.0</version>
   <packaging>jar</packaging>
-  <name>RaidenEnderChest</name>
+  <name>RaidenSistem</name>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
@@ -32,9 +32,9 @@
   </dependencies>
 
   <build>
-    <finalName>RaidenEnderChest</finalName>
+    <finalName>RaidenSistem</finalName>
     <resources>
-      <!-- plugin.yml + enderchest.rai -->
+      <!-- plugin.yml + sistem.rai -->
       <resource>
         <directory>src/main/resources</directory>
         <filtering>false</filtering>

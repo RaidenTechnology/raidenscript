@@ -1,21 +1,185 @@
-# RAIDEN BÜYÜ MASASI — sistemin TAMAMI.
+# RAIDEN SİSTEM — sunucunun kural katmanının TAMAMI.
 #
-# Bu dosyada olanlar: hangi büyüler var, ne yaparlar, kaç seviye çıkarlar,
-# hangi eşyaya takılırlar, kaça mal olurlar, hangisi hangisiyle çakışır,
-# bir eşyanın kaç büyü yuvası olduğu, arayüzün nasıl dizildiği, her mesajın
-# metni ve rengi.
+# Tek dosya, tek VM, tek yerel kütüphane. Yeni bir sistem eklemek yeni bir jar
+# değil, bu dosyaya yeni bir bölüm demek.
 #
-# Java'da olanlar: mc.* ilkelleri. "Sandık arayüzü aç", "şu yuvaya şu eşyayı
-# koy", "giriş eşyasına şu statı ekle", "XP düş". Tek bir büyü kuralı orada yok.
+# İÇİNDEKİLER
+#   1. Ortak yardımcılar
+#   2. Ender Sandığı   -> /ec
+#   3. Büyü Masası     -> /buyu
+#   4. Giriş noktaları (Java buraya çağırıyor)
 #
-# ENTEGRASYON: statlar raiden-combatstats'ın okuduğu PDC şemasına yazılıyor
-# (raidenrpg:rpg_stat_<stat>). Mevcut plugin'lerin tek satırı değişmedi.
+# Java'da olanlar: mc.* ilkelleri. "Ender sandığını aç", "sandık arayüzü aç",
+# "şu yuvaya şu eşyayı koy", "PDC'ye şu statı ekle", "XP düş". Tek bir oyun
+# kuralı orada yok.
 #
-# DÜZENLE VE ÇALIŞTIR: dosyayı değiştir, oyunda '/buyu yenile' yaz.
+# ENTEGRASYON: büyü statları raiden-combatstats'ın okuduğu PDC şemasına
+# yazılıyor (raidenrpg:rpg_stat_<stat>, DELTA olarak). Mevcut plugin'lerin tek
+# satırı değişmedi.
+#
+# DÜZENLE VE ÇALIŞTIR: bu dosyayı değiştir, oyunda '/rai yenile' yaz.
+# Sunucuyu kapatmaya gerek yok.
 
 include mc
 
 
+# ############################################################
+# #  1. ORTAK
+# ############################################################
+
+fn izinli(uuid: str, izin: str) -> bool:
+    return mc.izinVar(uuid, izin) == 1
+
+fn anahtarVar(harita, anahtar) -> bool:
+    for k in harita.keys():
+        if k == anahtar:
+            return true
+    return false
+
+
+# ############################################################
+# #  2. ENDER SANDIĞI   ->  /ec
+# ############################################################
+# ============================================================
+#  AYARLAR
+# ============================================================
+
+BEKLEME = 5.0                              # saniye; 0 yaparsan bekleme kalkar
+
+EC_IZIN_KULLAN     = "raiden.ec.kullan"
+IZIN_BASKASI    = "raiden.ec.baskasi"
+IZIN_BEKLEMESIZ = "raiden.ec.beklemesiz"
+
+ACILIS_SESI   = "block.ender_chest.open"
+RET_SESI      = "block.note_block.bass"
+PARCACIK      = "PORTAL"
+PARCACIK_ADET = 24
+
+# Başkasının sandığı açıldığında hedefe haber verilsin mi?
+HEDEFE_HABER_VER = true
+
+
+# ============================================================
+#  DURUM
+# ============================================================
+
+sonKullanim = {}          # uuid -> son açılış zamanı (saniye)
+acilisSayisi = 0
+
+
+# ============================================================
+#  YARDIMCILAR
+# ============================================================
+
+fn kalanBekleme(uuid: str) -> f64:
+    if BEKLEME <= 0.0 or izinli(uuid, IZIN_BEKLEMESIZ):
+        return 0.0
+    if not anahtarVar(sonKullanim, uuid):
+        return 0.0
+    gecen = mc.zaman() - sonKullanim[uuid]
+    if gecen >= BEKLEME:
+        return 0.0
+    return BEKLEME - gecen
+
+# Ekranda "2.4 sn" değil "3 sn" görünsün: yukarı yuvarlanmış tam saniye.
+fn saniyeYaz(kalan: f64) -> str:
+    tam = int(kalan)
+    if kalan > tam:
+        tam = tam + 1
+    return f"{tam}"
+
+fn ret(uuid: str, metin: str):
+    mc.mesaj(uuid, f"§c{metin}")
+    mc.ses(uuid, RET_SESI, 0.7, 0.8)
+    return 0
+
+fn acilisEfekti(uuid: str):
+    mc.ses(uuid, ACILIS_SESI, 0.8, 1.0)
+    mc.parcacik(uuid, PARCACIK, PARCACIK_ADET)
+    return 0
+
+
+# ============================================================
+#  KOMUT
+# ============================================================
+#
+# Java bağlamı ittirmiyor, betik ÇEKİYOR (capi.h deseni): rs_call yalnızca sayı
+# taşıdığı için oyuncu kimliği ve argümanlar mc.komut* ile alınıyor.
+
+fn ecKomut():
+    uuid = mc.komutOyuncu()
+    if uuid == "":
+        return 0
+
+    if not izinli(uuid, EC_IZIN_KULLAN):
+        return ret(uuid, "Ender sandığını açma yetkin yok.")
+
+    if int(mc.komutArgSayisi()) == 0:
+        return kendiSandigi(uuid)
+    return baskasininSandigi(uuid, mc.komutArg(0))
+
+
+fn kendiSandigi(uuid: str):
+    kalan = kalanBekleme(uuid)
+    if kalan > 0.0:
+        return ret(uuid, f"Biraz bekle — {saniyeYaz(kalan)} sn kaldı.")
+
+    if mc.enderAc(uuid, uuid) != 1:
+        return ret(uuid, "Sandık açılamadı.")
+
+    sonKullanim[uuid] = mc.zaman()
+    outer acilisSayisi = acilisSayisi + 1
+    acilisEfekti(uuid)
+    mc.mesaj(uuid, "§b§lEnder Sandığı §r§7açıldı.")
+
+    if acilisSayisi % 10 == 0:
+        mc.log(f"Ender sandığı {acilisSayisi} kez açıldı.")
+    return 0
+
+
+fn baskasininSandigi(uuid: str, hedefAdi: str):
+    if not izinli(uuid, IZIN_BASKASI):
+        return ret(uuid, "Başkasının sandığına bakma yetkin yok.")
+
+    hedef = mc.oyuncuBul(hedefAdi)
+    if hedef == "":
+        return ret(uuid, f"'{hedefAdi}' adında çevrimiçi bir oyuncu yok.")
+
+    if hedef == uuid:
+        # Kendi adını yazmak hata değil, sadece uzun yol.
+        return kendiSandigi(uuid)
+
+    kalan = kalanBekleme(uuid)
+    if kalan > 0.0:
+        return ret(uuid, f"Biraz bekle — {saniyeYaz(kalan)} sn kaldı.")
+
+    if mc.enderAc(uuid, hedef) != 1:
+        return ret(uuid, "Sandık açılamadı — oyuncu az önce çıkmış olabilir.")
+
+    sonKullanim[uuid] = mc.zaman()
+    outer acilisSayisi = acilisSayisi + 1
+    acilisEfekti(uuid)
+
+    hedefAd = mc.ad(hedef)
+    bakanAd = mc.ad(uuid)
+    mc.mesaj(uuid, f"§b§l{hedefAd} §r§7oyuncusunun ender sandığı açıldı.")
+
+    # Gizli gözetleme yok: hedef bilsin. Bu bir kural, ilkel değil — yeri burası.
+    if HEDEFE_HABER_VER:
+        mc.mesaj(hedef, f"§7{bakanAd} §8ender sandığına baktı.")
+
+    mc.log(f"{bakanAd} -> {hedefAd} ender sandığı")
+    return 0
+
+
+# ============================================================
+#  KURULUM
+# ============================================================
+
+
+# ############################################################
+# #  3. BÜYÜ MASASI   ->  /buyu
+# ############################################################
 # ============================================================
 #  NADİRLİK MERDİVENİ
 # ============================================================
@@ -132,7 +296,7 @@ CERCEVE = [0,1,2,3,4,5,6,7,8, 9,10,11,12,14,15,16,17, 18,19,20,21,22,23,24,25,26
 LISTE_BASI = 27          # büyü düğmeleri buradan başlıyor
 BILGI_YUVASI = 49
 
-IZIN_KULLAN = "raiden.buyu.kullan"
+BUYU_IZIN_KULLAN = "raiden.buyu.kullan"
 
 
 # ============================================================
@@ -352,21 +516,15 @@ fn buyule(uuid: str, buyu):
     masayiCiz(uuid)
     return 0
 
-fn ret(uuid: str, metin: str):
-    mc.mesaj(uuid, f"§c{metin}")
-    mc.ses(uuid, "block.note_block.bass", 0.7, 0.8)
-    return 0
-
-
 # ============================================================
 #  OLAYLAR
 # ============================================================
 
-fn komut():
+fn buyuKomut():
     uuid = mc.komutOyuncu()
     if uuid == "":
         return 0
-    if int(mc.izinVar(uuid, IZIN_KULLAN)) != 1:
+    if int(mc.izinVar(uuid, BUYU_IZIN_KULLAN)) != 1:
         return ret(uuid, "Büyü masasını kullanma yetkin yok.")
     mc.guiAc(uuid, BASLIK, SATIR)
     masayiCiz(uuid)
@@ -390,6 +548,23 @@ fn girisDegisti():
     masayiCiz(uuid)
     return 0
 
+# ############################################################
+# #  4. GİRİŞ NOKTALARI
+# ############################################################
+#
+# Java hangi komutun yazıldığını itmiyor, betik ÇEKİYOR (capi.h deseni:
+# rs_call yalnızca sayı taşıyor, dize argümanı geçemiyor).
+
+fn komut():
+    hangi = mc.komutAdi()
+    if hangi == "ec" or hangi == "endersandik" or hangi == "esandik":
+        return ecKomut()
+    if hangi == "buyu" or hangi == "buyumasasi" or hangi == "enchant2":
+        return buyuKomut()
+    return 0
+
 fn kur():
-    mc.log(f"Raiden Büyü Masası hazır — {len(BUYULER)} büyü, {len(NADIRLIK_ADLARI)} nadirlik")
+    n = len(BUYULER)
+    b = int(BEKLEME)
+    mc.log(f"Raiden Sistem hazır — ender sandığı (bekleme {b} sn) + büyü masası ({n} büyü)")
     return 0
