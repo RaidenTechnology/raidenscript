@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAIDEN BANK — RaidenScript demosu</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="yukleniyor" class="yukleniyor">RaidenScript yükleniyor…</div>
+
+<!-- ================= GİRİŞ ================= -->
+<section id="girisEkrani" class="giris" hidden>
+  <form id="girisFormu" class="giris-kutu">
+    <div class="marka"><span class="simsek">⚡</span><span id="bankaAd">—</span></div>
+    <p class="giris-alt">İnternet Şubesi</p>
+
+    <label class="alan">
+      <span>Müşteri numarası</span>
+      <input type="text" id="alan_musteriNoGiris" value="4471029" readonly>
+    </label>
+
+    <label class="alan">
+      <span>Parola (PIN)</span>
+      <input type="password" id="alan_pin" inputmode="numeric" maxlength="4"
+             placeholder="••••" autocomplete="off" autofocus>
+    </label>
+
+    <button type="submit" class="dugme dugme-ana">Giriş yap</button>
+
+    <p class="ipucu soluk">
+      Şube <span id="subeKodu">—</span> · Müşteri <span id="musteriNo">—</span><br>
+      Demo PIN: <code>8419</code> — yanlış girersen betik deneme hakkını sayar.
+    </p>
+  </form>
+</section>
+
+<!-- ================= UYGULAMA ================= -->
+<div id="uygulamaEkrani" hidden>
+
+  <header class="ust">
+    <div class="marka"><span class="simsek">⚡</span>RAIDEN BANK</div>
+    <div class="ust-sag">
+      <span id="musteriAd" class="ad">—</span>
+      <span id="bugun" class="kucuk soluk">—</span>
+    </div>
+  </header>
+
+  <div id="durum" class="durum"></div>
+
+  <main class="duzen">
+
+    <aside class="yan">
+      <h2 class="baslik">Hesaplarım</h2>
+      <div id="hesapListesi"></div>
+      <div class="toplam">
+        <span class="kucuk soluk">Toplam varlık</span>
+        <span><span id="toplamVarlik">—</span> <span id="toplamBirim"></span></span>
+      </div>
+    </aside>
+
+    <section class="ana">
+      <nav class="sekmeler">
+        <button class="sekme etkin" data-panel="transfer" type="button">Para transferi</button>
+        <button class="sekme" data-panel="ekstre" type="button">Hesap hareketleri</button>
+        <button class="sekme" data-panel="projeksiyon" type="button">Birikim projeksiyonu</button>
+      </nav>
+
+      <!-- transfer -->
+      <div id="panel_transfer" class="panel">
+        <div class="gonderen">
+          <span class="kucuk soluk">Gönderen hesap</span>
+          <strong id="gonderenAd">—</strong>
+          <span class="iban" id="gonderenIban">—</span>
+          <div class="gonderen-alt">
+            <span>Bakiye <b id="gonderenBakiye">—</b></span>
+            <span>Kalan günlük limit <b id="kalanLimit">—</b></span>
+          </div>
+        </div>
+
+        <form id="transferFormu" class="form">
+          <label class="alan">
+            <span>Alıcı IBAN</span>
+            <input type="text" id="alan_iban" placeholder="TR91 0006 2001 1978 6457 8414 26"
+                   autocomplete="off" spellcheck="false">
+            <small id="ibanDurum" class="ipucu"></small>
+          </label>
+
+          <label class="alan">
+            <span>Tutar</span>
+            <input type="text" id="alan_tutar" placeholder="2.500,00" autocomplete="off">
+            <small class="ipucu soluk">Virgüllü ya da noktalı yazabilirsin — betik ikisini de okur.</small>
+          </label>
+
+          <label class="alan">
+            <span>Açıklama</span>
+            <input type="text" id="alan_aciklama" placeholder="Kira - Temmuz" autocomplete="off">
+          </label>
+
+          <button type="submit" class="dugme dugme-ana">Transferi onayla</button>
+        </form>
+
+        <details class="deneme">
+          <summary>Denenecek senaryolar</summary>
+          <ul>
+            <li><b>Başarılı havale:</b> <code>TR91 0006 2001 1978 6457 8414 26</code> — aynı banka, ücretsiz</li>
+            <li><b>EFT ücreti:</b> <code>TR56 0011 1000 0000 0102 0304 05</code> — başka banka, 15,50 kesilir</li>
+            <li><b>Geçersiz IBAN:</b> yukarıdakinin son hanesini değiştir — mod-97 tutmaz</li>
+            <li><b>Yetersiz bakiye:</b> bakiyeden büyük bir tutar yaz</li>
+            <li><b>Günlük limit:</b> Birikim hesabını seçip 60.000 gönder — limit 50.000</li>
+            <li><b>Para birimi:</b> <code>TR26 0006 1005 1978 6457 8413 55</code> — TRY'den USD hesaba</li>
+          </ul>
+        </details>
+      </div>
+
+      <!-- ekstre -->
+      <div id="panel_ekstre" class="panel" hidden>
+        <div class="panel-ust">
+          <h2 class="baslik" id="ekstreBaslik">—</h2>
+          <span class="kucuk soluk" id="ekstreOzet">—</span>
+        </div>
+        <table class="tablo">
+          <thead>
+            <tr><th>Tarih</th><th>İşlem</th><th>Açıklama</th><th class="sayi">Tutar</th><th class="sayi">Bakiye</th></tr>
+          </thead>
+          <tbody id="ekstreGovde"></tbody>
+        </table>
+      </div>
+
+      <!-- projeksiyon -->
+      <div id="panel_projeksiyon" class="panel" hidden>
+        <div class="panel-ust">
+          <h2 class="baslik" id="projeksiyonHesap">—</h2>
+          <span class="kucuk soluk">
+            Anapara <b id="projeksiyonAnapara">—</b> · yıllık net getiri <b id="projeksiyonOran">—</b>
+          </span>
+        </div>
+        <table class="tablo">
+          <thead>
+            <tr><th>Dönem</th><th class="sayi">Bakiye</th><th class="sayi">Kazanç</th></tr>
+          </thead>
+          <tbody id="projeksiyonGovde"></tbody>
+        </table>
+        <p class="ipucu soluk">Bileşik faiz yıl yıl çarpılarak hesaplanıyor; kuruşa yuvarlama tek yönlü.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="alt">
+    Bu sayfadaki bütün bankacılık mantığı
+    <a href="banka.rai" target="_blank"><code>banka.rai</code></a> içinde —
+    IBAN mod-97 doğrulaması, para aritmetiği, limit ve ücret kuralları, ekran metinleri.
+    JavaScript yalnızca DOM'a çiziyor.
+    <a href="https://github.com/RaidenTechnology/raidenscript" target="_blank" rel="noopener">RaidenScript</a>
+  </footer>
+</div>
+
+<script src="../../dist/raidenscript.js"></script>
+<script src="../../bindings/js/rs-host.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

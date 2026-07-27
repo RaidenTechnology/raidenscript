@@ -1311,20 +1311,31 @@ std::optional<Value> Interpreter::hostModul(const std::string& modul) {
         if (m != modul) {
             continue;
         }
-        // Her host fonksiyonu bir native'e sarılır: argümanlar double'a çevrilip
-        // köprüye verilir, dönen sayı betiğe sonuç olur.
+        // Her host fonksiyonu bir native'e sarılır: argümanlar köprüye verilir,
+        // dönen değer betiğe sonuç olur. Dize argümanlar kopyalanmaz — çağrı
+        // boyunca 'a' yaşadığı için işaretçi vermek güvenli ve bedava.
         const std::string fnAd = f;
         HostFn cb = hostFn_;
         harita->entries.emplace_back(
             makeStr(fnAd),
             makeNative(modul + "." + fnAd, 0, -1,
                        [modul, fnAd, cb](std::vector<Value>& a) -> Value {
-                           std::vector<double> sayilar;
-                           sayilar.reserve(a.size());
+                           std::vector<HostArg> argumanlar;
+                           argumanlar.reserve(a.size());
                            for (const auto& v : a) {
-                               sayilar.push_back(toDouble(v));
+                               HostArg h;
+                               if (const auto* sp = std::get_if<Str>(&v)) {
+                                   h.dize = sp->get();
+                               } else {
+                                   h.sayi = toDouble(v);
+                               }
+                               argumanlar.push_back(h);
                            }
-                           return cb(modul, fnAd, sayilar);
+                           const HostSonuc s = cb(modul, fnAd, argumanlar);
+                           if (s.dizeMi) {
+                               return makeStr(s.dize);
+                           }
+                           return s.sayi;
                        }));
     }
     if (harita->entries.empty()) {

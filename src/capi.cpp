@@ -37,6 +37,13 @@ struct rs_vm {
 
     std::string sonHata;
     bool yuklendi = false;
+
+    // Dize kanalı — yalnızca host geri çağrısı sürerken anlamlı.
+    // aktifArg, yorumlayıcının yığınındaki argüman vektörünü gösterir;
+    // sahibi biz değiliz, çağrı bitince mutlaka nullptr olmalı.
+    const std::vector<rs::Interpreter::HostArg>* aktifArg = nullptr;
+    std::string donenDize;
+    bool donenDizeVar = false;
 };
 
 namespace {
@@ -60,6 +67,21 @@ std::string taniMetni(const rs::Diagnostics& d) {
 #endif
     return oss.str();
 }
+
+// Geri çağrı boyunca aktif argümanları yayınlar, çıkışta MUTLAKA temizler.
+// Host geri çağrısı (özellikle JS/WASM tarafı) istisna fırlatabilir; elle
+// sıfırlamak o yolda dangling bir işaretçi bırakırdı.
+struct ArgKapsami {
+    rs_vm* vm;
+    ArgKapsami(rs_vm* v, const std::vector<rs::Interpreter::HostArg>& args) : vm(v) {
+        vm->aktifArg = &args;
+        vm->donenDize.clear();
+        vm->donenDizeVar = false;
+    }
+    ~ArgKapsami() { vm->aktifArg = nullptr; }
+    ArgKapsami(const ArgKapsami&) = delete;
+    ArgKapsami& operator=(const ArgKapsami&) = delete;
+};
 
 }  // namespace
 
@@ -133,12 +155,32 @@ int rs_eval(rs_vm* vm, const char* kaynak, const char* ad) {
     if (vm->host != nullptr) {
         rs_host_fn cb = vm->host;
         void* user = vm->user;
+        // vm'i yakalamak güvenli: lambda interp'in içinde yaşıyor, interp ise
+        // rs_vm'in SON üyesi — yani vm'den önce yıkılıyor.
         vm->interp->setHostBridge(
             vm->kayitli,
-            [cb, user](const std::string& modul, const std::string& fn,
-                       const std::vector<double>& args) -> double {
-                return cb(modul.c_str(), fn.c_str(), args.empty() ? nullptr : args.data(),
-                          static_cast<int>(args.size()), user);
+            [vm, cb, user](const std::string& modul, const std::string& fn,
+                           const std::vector<rs::Interpreter::HostArg>& args)
+                -> rs::Interpreter::HostSonuc {
+                std::vector<double> sayilar;
+                sayilar.reserve(args.size());
+                for (const auto& a : args) {
+                    sayilar.push_back(a.sayi);
+                }
+
+                const ArgKapsami kapsam(vm, args);
+                const double d = cb(modul.c_str(), fn.c_str(),
+                                    sayilar.empty() ? nullptr : sayilar.data(),
+                                    static_cast<int>(sayilar.size()), user);
+
+                rs::Interpreter::HostSonuc s;
+                if (vm->donenDizeVar) {
+                    s.dizeMi = true;
+                    s.dize = std::move(vm->donenDize);
+                } else {
+                    s.sayi = d;
+                }
+                return s;
             });
     }
 
@@ -195,6 +237,25 @@ const char* rs_last_error(rs_vm* vm) {
         return "";
     }
     return vm->sonHata.c_str();
+}
+
+const char* rs_arg_str(rs_vm* vm, int i) {
+    if (vm == nullptr || vm->aktifArg == nullptr || i < 0) {
+        return nullptr;
+    }
+    if (static_cast<std::size_t>(i) >= vm->aktifArg->size()) {
+        return nullptr;
+    }
+    const std::string* p = (*vm->aktifArg)[static_cast<std::size_t>(i)].dize;
+    return p != nullptr ? p->c_str() : nullptr;
+}
+
+void rs_return_str(rs_vm* vm, const char* s) {
+    if (vm == nullptr || vm->aktifArg == nullptr || s == nullptr) {
+        return;
+    }
+    vm->donenDize = s;
+    vm->donenDizeVar = true;
 }
 
 }  // extern "C"

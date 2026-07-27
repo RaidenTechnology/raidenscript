@@ -59,6 +59,23 @@ rai                                        # REPL
 registered and no shell profile is touched. `make install PREFIX=/somewhere/else`
 if you want it elsewhere, `make uninstall` to remove it.
 
+## In the browser
+
+[`demo/banka/`](demo/banka) is an internet-banking interface where the entire
+application — accounts, IBAN mod-97 validation, money arithmetic, transfer
+rules, every string on screen — lives in [`banka.rai`](demo/banka/banka.rai).
+JavaScript only draws to the DOM.
+
+```bash
+make wasm && python -m http.server 8801
+# http://localhost:8801/demo/banka/  — demo PIN 8419
+```
+
+The same core runs in the terminal, unchanged, as
+[`examples/16-banka-arayuzu.rai`](examples/16-banka-arayuzu.rai) — and produces
+the same numbers. That is the point of the embedding layer: the host is a
+rendering device, not a place where logic leaks to.
+
 ## Editor support
 
 [`editors/vscode/`](editors/vscode) is a VS Code extension: syntax highlighting,

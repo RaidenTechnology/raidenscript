@@ -50,8 +50,24 @@ public:
     // --- gömme (Faz 4 / C API) ---
 
     // Host'a giden çağrı. Betikteki 'game.spawnBullet(x, y)' buraya düşer.
-    using HostFn = std::function<double(const std::string& modul, const std::string& fn,
-                                        const std::vector<double>& args)>;
+    //
+    // DİZE KANALI. Sınırın yalnızca sayı taşıması bilinçli bir karardı: sayı
+    // kopyalanır, sahiplik sorusu doğmaz. Ama metinsiz bir uygulama arayüzü
+    // yazılamıyor — IBAN, açıklama, hata mesajı hep dize. Çözüm dizeleri
+    // sayıya SIKIŞTIRMAK değil, argümanın yanında ayrı bir alanda taşımak:
+    // sayı yolu bir bayt değişmiyor, mevcut host'lar etkilenmiyor, ve
+    // "şu double aslında bir tutamak" gibi sessiz bir sözleşme doğmuyor.
+    struct HostArg {
+        double sayi = 0;
+        const std::string* dize = nullptr;  // nullptr => argüman sayı
+    };
+    struct HostSonuc {
+        double sayi = 0;
+        bool dizeMi = false;
+        std::string dize;
+    };
+    using HostFn = std::function<HostSonuc(const std::string& modul, const std::string& fn,
+                                           const std::vector<HostArg>& args)>;
 
     // Host'un sağladığı modül/fonksiyon çiftleri. 'include <modul>' görüldüğünde
     // nil yerine bu tablodan bir harita bağlanır. eval'den ÖNCE kurulmalı.

@@ -100,6 +100,51 @@ async function main() {
     b.close();
   }
 
+  // 6 — dize kanalı: JS host fonksiyonu dize alıp dize döndürüyor
+  {
+    const form = { iban: 'TR33 0006 1005 1978 6457 8413 26', tutar: '250,00' };
+    const yazilan = [];
+    const vm = RS.open({
+      ui: {
+        girdi: (alan) => form[alan] || '',
+        yaz: (metin, seviye) => {
+          yazilan.push(seviye + ':' + metin);
+          return yazilan.length;
+        },
+      },
+    });
+    vm.eval(
+      'include ui\n' +
+      'fn calis():\n' +
+      '    iban = ui.girdi("iban")\n' +
+      '    temiz = iban.replaceAll(" ", "")\n' +
+      '    ui.yaz(f"uzunluk {len(temiz)}", 1)\n' +
+      '    ui.yaz(temiz.upper(), 2)\n' +
+      '    return len(temiz)\n',
+      'w6.rai'
+    );
+    const out = vm.call('calis', []);
+    const tamam = yakin(out, 26) &&
+                  yazilan.length === 2 &&
+                  yazilan[0] === '1:uzunluk 26' &&
+                  yazilan[1] === '2:TR330006100519786457841326';
+    bildir(tamam, 'wasm: dize kanali (host -> betik -> host)',
+           tamam ? '' : JSON.stringify(yazilan) + ' out=' + out);
+    vm.close();
+  }
+
+  // 7 — dize ve sayı aynı çağrıda karışmıyor
+  {
+    let gorulen = null;
+    const vm = RS.open({ ui: { kart: (ad, tutar, birim) => { gorulen = [ad, tutar, birim]; return 0; } } });
+    vm.eval('include ui\n\nfn ciz():\n    return ui.kart("Vadesiz", 4782560, "TRY")\n', 'w7.rai');
+    vm.call('ciz', []);
+    const tamam = gorulen && gorulen[0] === 'Vadesiz' &&
+                  gorulen[1] === 4782560 && gorulen[2] === 'TRY';
+    bildir(tamam, 'wasm: dize/sayi/dize ayni cagrida karismiyor', JSON.stringify(gorulen));
+    vm.close();
+  }
+
   console.log('\ngecen: ' + gecen + '  kalan: ' + kalan);
   process.exit(kalan === 0 ? 0 : 1);
 }

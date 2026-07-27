@@ -15,9 +15,17 @@
 //     vm.call("atesEt", [oyuncu.x, oyuncu.y]);
 //     vm.close();
 //
-// SINIR SKALER: hem argümanlar hem dönüş değeri sayıdır (capi.h). Metin veya
-// yapı gerekirse C tarafına ayrı bir fonksiyon eklenmeli — burada uydurma
-// serileştirme YOK, çünkü sessizce yanlış veri taşımaktansa derleme hatası iyidir.
+// SINIR: sayılar args[] dizisinden, dizeler capi.h'daki dize kanalından geçer
+// (rs_arg_str / rs_return_str). JS tarafında bu görünmez — host fonksiyonun
+// sıradan JS değerleri alır ve döndürür:
+//
+//     ui: {
+//         girdi:  (alan)        => formdaki[alan],      // dize döner
+//         yaz:    (metin, satir) => { ... },            // dize + sayı alır
+//     }
+//
+// Uydurma serileştirme hâlâ YOK: liste/harita sınırdan geçmez. Geçmesi
+// gerekiyorsa betik onu satır satır host'a yazar.
 
 (function (global) {
   'use strict';
@@ -70,13 +78,15 @@
 
     const self = this;
 
-    // Betikten gelen çağrı buraya düşer. Sayılar HEAPF64'ten okunur.
+    // Betikten gelen çağrı buraya düşer. Sayılar HEAPF64'ten, dizeler
+    // rs_arg_str'den okunur — hangisi olduğunu C tarafı biliyor, biz sormuyoruz.
     this._cbPtr = M.addFunction(function (modulPtr, fnPtr, argsPtr, argc, _user) {
       const modul = M.UTF8ToString(modulPtr);
       const fn = M.UTF8ToString(fnPtr);
       const args = new Array(argc);
       for (let i = 0; i < argc; i++) {
-        args[i] = M.HEAPF64[(argsPtr >> 3) + i];
+        const sp = M._rs_arg_str(self.ptr, i);
+        args[i] = sp ? M.UTF8ToString(sp) : M.HEAPF64[(argsPtr >> 3) + i];
       }
       const mod = self.modules[modul];
       const f = mod && mod[fn];
@@ -87,6 +97,12 @@
         return 0;
       }
       const sonuc = f.apply(null, args);
+      if (typeof sonuc === 'string') {
+        const p = strYaz(M, sonuc);
+        M._rs_return_str(self.ptr, p);
+        M._free(p);
+        return 0;  // rs_return_str çağrıldıysa bu değer yok sayılır
+      }
       return typeof sonuc === 'number' && isFinite(sonuc) ? sonuc : 0;
     }, HOST_FN_SIG);
 

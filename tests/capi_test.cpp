@@ -177,6 +177,94 @@ void t9() {
     rs_free(vm);
 }
 
+// --- dize kanalı (adım 5) ---
+
+// Betikten gelen dizeyi okur, ters çevirip geri döndürür. Ayrıca sayı
+// argümanların args[] yolundan gelmeye devam ettiğini doğrular.
+struct DizeKayit {
+    std::string gelen;
+    bool ikinciSayiMi = false;
+    double ikinciSayi = 0.0;
+    bool ucuncuNullMu = false;
+};
+
+rs_vm* aktifVm = nullptr;
+
+double dizeHost(const char* modul, const char* fn, const double* args, int argc, void* user) {
+    (void)modul;
+    auto* k = static_cast<DizeKayit*>(user);
+
+    const char* s = rs_arg_str(aktifVm, 0);
+    k->gelen = s != nullptr ? s : "<NULL>";
+
+    if (argc > 1) {
+        k->ikinciSayiMi = rs_arg_str(aktifVm, 1) == nullptr;
+        k->ikinciSayi = args[1];
+    }
+    k->ucuncuNullMu = rs_arg_str(aktifVm, 7) == nullptr;  // sınır dışı -> NULL
+
+    if (std::strcmp(fn, "yankila") == 0) {
+        std::string ters(k->gelen.rbegin(), k->gelen.rend());
+        rs_return_str(aktifVm, ters.c_str());
+        return 0.0;  // yok sayılmalı
+    }
+    return 42.0;
+}
+
+// 10 — betik -> host dize, host -> betik dize, sayı yolu bozulmadan
+void t10() {
+    rs_vm* vm = rs_new();
+    aktifVm = vm;
+    DizeKayit k;
+    rs_set_host(vm, dizeHost, &k);
+    rs_register(vm, "ui", "yankila");
+    const int e = rs_eval(vm,
+                          "include ui\n"
+                          "fn dene():\n"
+                          "    d = ui.yankila(\"RaidenScript\", 7)\n"
+                          "    return len(d)\n",
+                          "t10.rai");
+    double out = 0.0;
+    const int c = rs_call(vm, "dene", nullptr, 0, &out);
+    bildir(e == 0 && c == 0 && k.gelen == "RaidenScript" && yakin(out, 12.0),
+           "dize gidiyor, dize donuyor (uzunluk 12)", rs_last_error(vm));
+    bildir(k.ikinciSayiMi && yakin(k.ikinciSayi, 7.0),
+           "sayi argumani args[] yolundan geliyor, rs_arg_str NULL");
+    bildir(k.ucuncuNullMu, "sinir disi indis NULL donuyor");
+    rs_free(vm);
+    aktifVm = nullptr;
+}
+
+// 11 — rs_return_str çağrılmazsa eski sayı davranışı aynen sürüyor
+void t11() {
+    rs_vm* vm = rs_new();
+    aktifVm = vm;
+    DizeKayit k;
+    rs_set_host(vm, dizeHost, &k);
+    rs_register(vm, "ui", "sayiVer");
+    rs_eval(vm,
+            "include ui\n"
+            "fn dene():\n"
+            "    return ui.sayiVer(\"x\") + 1\n",
+            "t11.rai");
+    double out = 0.0;
+    const int c = rs_call(vm, "dene", nullptr, 0, &out);
+    bildir(c == 0 && yakin(out, 43.0), "dize donmeyen host cagrisi hala sayi",
+           rs_last_error(vm));
+    rs_free(vm);
+    aktifVm = nullptr;
+}
+
+// 12 — geri çağrı dışında rs_arg_str NULL, rs_return_str sessiz
+void t12() {
+    rs_vm* vm = rs_new();
+    const bool a = rs_arg_str(vm, 0) == nullptr;
+    rs_return_str(vm, "yoksayilmali");
+    const bool b = rs_arg_str(nullptr, 0) == nullptr;
+    bildir(a && b, "geri cagri disinda dize kanali kapali");
+    rs_free(vm);
+}
+
 }  // namespace
 
 int main() {
@@ -190,6 +278,9 @@ int main() {
     t7();
     t8();
     t9();
+    t10();
+    t11();
+    t12();
     std::cout << "\ngecen: " << gecen << "  kalan: " << kalan << '\n';
     return kalan == 0 ? 0 : 1;
 }

@@ -53,6 +53,31 @@ int rs_call(rs_vm* vm, const char* fn, const double* args, int argc, double* out
  * Sahibi VM'dir; bir sonraki rs_* çağrısına kadar geçerlidir. Hata yoksa "". */
 const char* rs_last_error(rs_vm* vm);
 
+/* --- Dize kanalı (Faz 4 / adım 5) ---------------------------------------
+ *
+ * rs_host_fn imzası DEĞİŞMEDİ: args[] hâlâ yalnızca double taşır ve mevcut
+ * host'lar (STAR BREAKER dahil) olduğu gibi çalışır. Dizeler sayının içine
+ * sıkıştırılmaz — yanlarında ayrı bir kanalda gider ve bu iki fonksiyonla
+ * okunur/yazılır. Her ikisi de YALNIZCA geri çağrının içinde geçerlidir.
+ *
+ * Metin host'tan betiğe nasıl gider? Betik ÇEKER, host itmez:
+ *
+ *     betik:  iban = ui.girdi("iban")
+ *     host :  const char* alan = rs_arg_str(vm, 0);   // "iban"
+ *             rs_return_str(vm, formdakiDeger);       // betik dize alır
+ *
+ * Böylece rs_call'ın imzasına dokunmadan iki yön de açılıyor.
+ */
+
+/* i. argüman betikte bir DİZE ise metni, değilse NULL döner. Sayı argümanlar
+ * args[] dizisinden okunmaya devam eder. İşaretçi geri çağrı bitene kadar
+ * geçerlidir; saklanacaksa kopyalanmalı. */
+const char* rs_arg_str(rs_vm* vm, int i);
+
+/* Betiğe sayı yerine DİZE döndürür. Bu çağrıldıysa geri çağrının kendi dönüş
+ * değeri yok sayılır. Metin kopyalanır, sahiplik host'ta kalır. */
+void rs_return_str(rs_vm* vm, const char* s);
+
 #ifdef __cplusplus
 }  /* extern "C" */
 #endif
