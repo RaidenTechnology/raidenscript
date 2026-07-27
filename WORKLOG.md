@@ -697,3 +697,161 @@ Minimal Faz 4: C API + emscripten ile WASM, `game.*` bağlayıcısı, STAR BREAK
 RaidenScript ile tanımlanmış tek bir silah. Faz 2 (tipler) ve Faz 3 (bytecode VM)
 kasıtlı olarak atlanıyor — ağaç yürüyen yorumlayıcı olay tabanlı mod betikleri için
 fazlasıyla hızlı.
+
+---
+
+## 27 Temmuz 2026 — Faz 4 / adım 1: C gömme API'si (`fc7efd5`)
+
+**Dönüm noktası:** Dil ilk kez kendi terminalinin dışına çıkabilir hâle geldi.
+
+`src/capi.h` saf C: altı fonksiyon + `rs_host_fn` geri çağrısı. İçinde hiçbir C++ tipi
+geçmiyor ki emscripten, JNI ve diğer köprüler doğrudan kullanabilsin.
+
+**Kapsam kararları (bilinçli daraltma):**
+- **Bir VM = bir betik.** `rs_eval` bir kez çağrılır. Çoklu betik ömür sorusunu
+  büyütüyordu; gerektiğinde ikinci VM açmak daha ucuz.
+- **Sınırda yalnız `double`.** JSON elendi: `std.json` yok ve köprüsü 200-300 satır ek
+  iş. Sayı kopyalanır, sahiplik sorusu doğmaz.
+
+**🐛 Üye sırası yıkım sırasıdır.** `rs_vm` ömür sahibi ve `FnObj` AST'ye ham işaretçi
+tutuyor. Sıra `interp` → `prog` → `diag` → `src` olmalı; bozulursa yıkımda serbest
+bırakılmış AST okunuyor. Bu sıra bir yorumla kilitlendi.
+
+**🐛 `DEBUG=1`'de `-fsanitize=undefined` kullanılamıyor** — w64devkit'te `libubsan` yok.
+Yerine libstdc++'ın denetimli kipi kondu.
+
+`tests/capi_test.cpp` 9 test, `make test`.
+
+---
+
+## 27 Temmuz 2026 — Faz 4 / adım 2-4: WASM, JS köprüsü ve oyundaki ilk silah (`5bafeb8`)
+
+**Dönüm noktası:** Yayınlanmış bir oyunda, tanımı RaidenScript'te olan ilk silah.
+
+emsdk kuruldu (1,9 GB). `make wasm` → `dist/raidenscript.js` 62 KB + `.wasm` 392 KB.
+JS köprüsü `bindings/js/rs-host.js`, bundler'sız, düz script etiketiyle çalışıyor.
+
+**🐛 `-fwasm-exceptions` ZORUNLU.** emscripten C++ istisnalarını varsayılan olarak
+kapatıyor; açık olmadan ilk `return`'de `__cxa_throw` abort ediyor — çünkü yorumlayıcı
+akış kontrolünü (return/break/continue) istisnayla taşıyor. `-fexceptions` alternatifi
+her fonksiyon dönüşünde JS'e geçiş demek, kabul edilemez yavaş.
+
+**STAR BREAKER'da PLASMA LANCE.** `scripts/plazma.rai` hem sayıları hem ateş yelpazesini
+tanımlıyor; motor `ates(aci)` çağırıyor, betik `game.mermiUret(aci)` ile dönüyor, mermiyi
+motor üretiyor. **Mevcut silahların hiçbiri taşınmadı** — yayınlanmış oyunda regresyon
+riski almamak için yeni bir giriş eklendi. Bağlama savunmacı: WASM ya da betik hata
+verirse sahne motorun kendi yoluna düşüyor.
+
+---
+
+## 27 Temmuz 2026 — Faz 4 / adım 5: dize kanalı ve tarayıcıda çalışan banka (`a1b1422`, `01d9b33`)
+
+**Dönüm noktası:** Sınırın yalnız sayı taşıması Faz 4'te bilinçli bir karardı, ama
+metinsiz bir uygulama arayüzü yazılamıyor — IBAN, açıklama, hata mesajı hep dize.
+
+**Çözüm: dizeler sayının İÇİNE sıkıştırılmadı.** `args[]` dizisi bir bayt bile değişmedi;
+dizeler yanında ayrı bir kanalda taşınıyor (`rs_arg_str` / `rs_return_str`). `rs_host_fn`
+imzası DEĞİŞMEDİ, yani STAR BREAKER'ın köprüsü etkilenmedi. "Şu double aslında bir
+tutamak" gibi sessiz bir sözleşme de doğmadı — böyle bir sözleşme ilk yanlış okumada
+sessizce yanlış para taşırdı.
+
+**Metin host'tan betiğe ÇEKİLİYOR, itilmiyor:** betik `ui.girdi("iban")` der, host alan
+adını okuyup değeri döndürür. Böylece `rs_call`'ın imzasına dokunmadan iki yön de açıldı.
+
+**`demo/banka`:** IBAN mod-97 doğrulama, para biçimleme, transfer limitleri, EFT ücreti,
+ekstre, faiz projeksiyonu — hepsi `banka.rai`'de. JavaScript yalnızca DOM. Sınama:
+`app.js`'i terminal yazıcısıyla değiştirince `banka.rai` değişmeden çalışıyor.
+
+**🐛 Geri uyumluluk:** `rs-host.js` tek başına kopyalanabiliyor (STAR BREAKER öyle
+yapıyor). Yeni köprü + eski `.wasm` eşleşirse `_rs_arg_str` tanımsız olur ve her host
+çağrısı çökerdi. Kanal varlığı kurulumda bir kez ölçülüyor; yoksa sayı yoluna düşüyor.
+
+---
+
+## 27-28 Temmuz 2026 — Faz 5: web bağlayıcısı, dört hata ve bir mağaza (`e59553a`, `8352cc6`)
+
+**Soru:** RaidenScript animasyonlu web siteleri yazabilir mi? **Ölçüldü, cevap evet** —
+ve dile tek anahtar kelime eklemeden. Eksik olan host bağlayıcısıydı.
+
+| Ölçüm | Sonuç |
+|---|---|
+| Host çağrısı (DOM ilkeli) | 490 K/s → karede ~8.100 |
+| 200 öğe × 2 stil yazımı / kare | **1.45 ms** = bütçenin %9'u |
+| Aynı iş düz JS'te | 0.096 ms (RS ~15× yavaş) |
+
+Yani sınır darboğaz değil. **Yine de kare başına sürülmüyor:** animasyon bildirimsel
+(WAAPI + ViewTimeline/ScrollTimeline), çünkü compositor'da koşan animasyon betik
+yavaşlasa bile 60 fps'i düşürmez.
+
+### 🐛 Dört hata
+
+1. **WASM yığını 64 KB.** `-sSTACK_SIZE` yoktu; ağaç yürüyen yorumlayıcıda **~130
+   seviyede** özyineleme yığını taşırıyor ve taşma temiz hata değil, bellek bozulması —
+   aynı Module üzerinde yeni VM bile açılamıyor. `-sSTACK_SIZE=8MB` → güvenli derinlik
+   1000+, aşınca yakalanabilir hata. Maliyet: `.wasm` 3 bayt.
+2. **Kaçan JS istisnası yığını kalıcı sızdırıyor.** Host `throw` ederse istisna WASM
+   karelerinden geçerken yığın işaretçisi geri alınmıyor: 5.000 istisnada derinlik
+   1000→937, 50.000'de modül ölüyor. Üstüne betik bu hatayı `try/catch` ile
+   YAKALAYAMIYOR. Köprüye `try/catch` ağı kondu; C tarafına `rs_host_fail` planlandı.
+3. **`s = s + x` karesel.** 12.000 parçada `join`'den 7,3× yavaş; 3.000 birleştirme tek
+   başına bir kareyi yiyor.
+4. **Betik dize döndürünce `rs_call` sessizce 0 veriyor.** Dize kanalı yalnız
+   host→betik yönünde. En azından hata vermeli.
+
+### `demo/site` — RAIDEN PARÇA
+
+Bilgisayar bileşenleri mağazası: katalog, indirim, stok, filtre, sıralama, sepet, KDV,
+kargo eşiği, sistem kurucusunun uyumluluk kuralları (soket eşleşmesi, güç bütçesi,
+darboğaz tahmini) ve **hangi animasyonun ne zaman oynayacağı** — hepsi `magaza.rai`'de.
+Ölçüm: betik derleme 22 ms, sayfa kurulumu 83 ms, 424 düğüm, 0 host hatası.
+
+**🐛 Sınırda daraltma kuralı:** host'tan gelen her sayı `double`. `URUNLER[u]` kayan
+noktalı indisi kabul etmiyor — "Sepete ekle" düğmesi bu yüzden çalışmıyordu. Olay
+girişlerinde `int()` şart; SPEC'e yazılacak.
+
+---
+
+## 28 Temmuz 2026 — Faz 6: JVM köprüsü ve Minecraft (`133db03`, `95be3a4`, `08b830b`, `0efcdd0`)
+
+**Dönüm noktası:** Aynı yorumlayıcı artık **üç host'ta** koşuyor — terminal, tarayıcı
+(WASM), JVM (JNI). Gömülebilirlik tezinin asıl sınavı buydu.
+
+`bindings/jvm/rs_jni.cpp` + `RaidenScript.java`. Tasarım `rs-host.js` ile bilerek aynı:
+sayılar `args[]`'ten, dizeler ayrı kanaldan; Java tarafında host fonksiyonu sıradan
+`Object[]` alıp `Double` ya da `String` döndürüyor. `make jni` tek bir DLL üretiyor
+(hem yorumlayıcı hem JNI girişleri).
+
+**🐛 `-static-libgcc -static-libstdc++` şart** — yoksa DLL w64devkit'in çalışma zamanı
+DLL'lerini arar ve sunucuda "kütüphane bulunamadı" ile düşer.
+
+**🐛 Yerel kütüphane JVM'de tek sınıf yükleyicisine bağlanır.** İki plugin aynı DLL
+yolunu yüklemeye kalkarsa `UnsatisfiedLinkError`. Önce ayrı dosya adıyla çözüldü,
+sonra iki plugin tek pakette birleşince sorun kendiliğinden kalktı.
+
+**🐛 JVM yığını ~500 seviyede taşıyor ve SESSİZCE öldürüyor** — Java istisnası yok,
+`hs_err` günlüğü yok, çıkış kodu 127. `-Xss16m` ile güvenli derinlik ~5.000. Bu, WASM'daki
+1 numaralı hatanın JVM'deki karşılığı: yorumlayıcı özyinelemeyi yerel yığında taşıyor ve
+derinlik sayacı hâlâ yok.
+
+### `RaidenSistem` — kuralları `.rai`'de olan Paper plugin'i
+
+Tek jar, tek VM, tek `sistem.rai` (666 satır): ender sandığı (bekleme, izinler, hedefe
+haber) + büyü masası (16 büyü, 7 nadirlik, yuva sınırları, çakışmalar, XP eğrisi, arayüz
+düzeni, eşya üzerindeki büyü bloğu). Java 2 sınıf ve tek bir büyü adı geçmiyor.
+
+**Entegrasyon:** statlar mevcut `raiden-combatstats`'ın okuduğu PDC şemasına DELTA olarak
+yazılıyor (`raidenrpg:rpg_stat_<stat>`). Mevcut plugin'lerin tek satırı değişmedi.
+
+**🐛 Gerçek sunucuda yakalandı:** `NamespacedKey` yalnız `[a-z0-9/._-]` kabul ediyor,
+büyü id'leri ise camelCase (`celikDeri`). Sonuç sessiz değildi ama görünmezdi — köprünün
+`try/catch`'i istisnayı yutup 0 döndürüyordu, yani o büyüler "hiç takılı değil" gibi
+davranıyordu. Düzeltme Java tarafında; betiği Java'nın kısıtına uydurmak için
+çirkinleştirmek yanlış olurdu.
+
+`/rai yenile` sunucu kapanmadan kuralları değiştiriyor — derleme adımı olmamasının
+doğrudan faydası.
+
+### Sırada
+
+Faz 5/6'nın açtığı borçlar: özyineleme derinliği sayacı (üç host'ta da aynı sessiz ölüm),
+`rs_host_fail`, `rs_call`'ın dize dönüşünde sessiz sıfırı, dize `+=` için yerinde ekleme.
