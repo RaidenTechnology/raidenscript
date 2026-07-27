@@ -190,6 +190,22 @@ inline bool truthy(const Value& v) noexcept {
     return true;
 }
 
+// Gömme sınırında (C API) her şey double taşınır. Sayı olmayanlar için:
+// nil ve false -> 0, true -> 1, geri kalan -> 0. Kayıpsız değil, kasıtlı —
+// sınır skaler, tip taşımıyor (bkz. capi.h).
+inline double toDouble(const Value& v) noexcept {
+    if (const auto* i = std::get_if<std::int64_t>(&v)) {
+        return static_cast<double>(*i);
+    }
+    if (const auto* d = std::get_if<double>(&v)) {
+        return *d;
+    }
+    if (const auto* b = std::get_if<bool>(&v)) {
+        return *b ? 1.0 : 0.0;
+    }
+    return 0.0;
+}
+
 [[nodiscard]] std::string typeName(const Value& v);
 [[nodiscard]] std::string toDisplay(const Value& v);  // print için
 [[nodiscard]] std::string toRepr(const Value& v);     // iç içe gösterim için

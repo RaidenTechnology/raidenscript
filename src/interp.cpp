@@ -1296,6 +1296,64 @@ Value Interpreter::stdModul(const std::string& yol) {
     return m;
 }
 
+void Interpreter::setHostBridge(std::vector<std::pair<std::string, std::string>> kayitli,
+                                HostFn cb) {
+    hostKayit_ = std::move(kayitli);
+    hostFn_ = std::move(cb);
+}
+
+std::optional<Value> Interpreter::hostModul(const std::string& modul) {
+    if (!hostFn_) {
+        return std::nullopt;
+    }
+    auto harita = std::make_shared<MapObj>();
+    for (const auto& [m, f] : hostKayit_) {
+        if (m != modul) {
+            continue;
+        }
+        // Her host fonksiyonu bir native'e sarılır: argümanlar double'a çevrilip
+        // köprüye verilir, dönen sayı betiğe sonuç olur.
+        const std::string fnAd = f;
+        HostFn cb = hostFn_;
+        harita->entries.emplace_back(
+            makeStr(fnAd),
+            makeNative(modul + "." + fnAd, 0, -1,
+                       [modul, fnAd, cb](std::vector<Value>& a) -> Value {
+                           std::vector<double> sayilar;
+                           sayilar.reserve(a.size());
+                           for (const auto& v : a) {
+                               sayilar.push_back(toDouble(v));
+                           }
+                           return cb(modul, fnAd, sayilar);
+                       }));
+    }
+    if (harita->entries.empty()) {
+        return std::nullopt;
+    }
+    return Value{harita};
+}
+
+bool Interpreter::callGlobal(const std::string& ad, std::vector<Value>& args, Value& out) {
+    Value* hedef = globals_->find(ad);
+    if (hedef == nullptr) {
+        diag_->error(Span{0, 0}, "'" + ad + "' adında bir global yok",
+                     "betikte 'fn " + ad + "(...)' tanımlı mı?");
+        return false;
+    }
+    try {
+        out = cagir(*hedef, args, Span{0, 0});
+        return true;
+    } catch (const ScriptThrow& t) {
+        diag_->error(t.span, "betik istisna fırlattı: " + toDisplay(t.value));
+        return false;
+    } catch (const ReturnSignal&) {
+        // Fonksiyon gövdesi dışında return — cagirFn zaten yakalıyor, buraya
+        // düşerse dilin değil host'un hatası.
+        diag_->error(Span{0, 0}, "beklenmeyen 'return' sinyali");
+        return false;
+    }
+}
+
 void Interpreter::visit(const ImportStmt& s) {
     std::string ad = s.alias;
     if (ad.empty()) {
@@ -1310,8 +1368,12 @@ void Interpreter::visit(const ImportStmt& s) {
     Value modul{Nil{}};
     if (s.isInclude) {
         // 'include' std kütüphanesinden ÇÖZÜLMEZ — bağlayıcıyı host derlemeye katar.
-        diag_->warning(s.span, "'" + s.path + "' host bağlayıcısı henüz yok",
-                       "statik bağlayıcılar Faz 4'te gelecek; şimdilik nil olarak tanımlanıyor");
+        if (auto hm = hostModul(s.path)) {
+            modul = std::move(*hm);
+        } else {
+            diag_->warning(s.span, "'" + s.path + "' host bağlayıcısı henüz yok",
+                           "host bu modülü rs_register ile kaydetmemiş; nil olarak tanımlanıyor");
+        }
     } else if (s.isStd) {
         modul = stdModul(s.path);
         if (std::holds_alternative<Nil>(modul)) {

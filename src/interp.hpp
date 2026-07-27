@@ -7,8 +7,11 @@
 // Performans Faz 3'ün (bytecode VM) işi. Buradaki hedef DOĞRULUK.
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ast.hpp"
@@ -44,7 +47,23 @@ public:
         // REPL her tur icin yeni bir Diagnostics kullaniyor.
     void setDiagnostics(Diagnostics& d) { diag_ = &d; }
 
+    // --- gömme (Faz 4 / C API) ---
+
+    // Host'a giden çağrı. Betikteki 'game.spawnBullet(x, y)' buraya düşer.
+    using HostFn = std::function<double(const std::string& modul, const std::string& fn,
+                                        const std::vector<double>& args)>;
+
+    // Host'un sağladığı modül/fonksiyon çiftleri. 'include <modul>' görüldüğünde
+    // nil yerine bu tablodan bir harita bağlanır. eval'den ÖNCE kurulmalı.
+    void setHostBridge(std::vector<std::pair<std::string, std::string>> kayitli, HostFn cb);
+
+    // Global kapsamdaki bir fonksiyonu adıyla çağırır. Bulunamazsa ya da betik
+    // istisna fırlatırsa false döner; sebep diag_'a yazılır.
+    bool callGlobal(const std::string& ad, std::vector<Value>& args, Value& out);
+
 private:
+    // 'include' için host haritası kurar; modül kayıtlı değilse nullopt.
+    std::optional<Value> hostModul(const std::string& modul);
     // --- çekirdek ---
     Value eval(const Expr* e);
     void exec(const Stmt* s);
@@ -111,6 +130,10 @@ private:
 
     const Source* src_;
     Diagnostics* diag_;
+
+    // --- gömme köprüsü ---
+    std::vector<std::pair<std::string, std::string>> hostKayit_;  // (modül, fonksiyon)
+    HostFn hostFn_;
 
     std::shared_ptr<Environment> globals_;
     std::shared_ptr<Environment> env_;
