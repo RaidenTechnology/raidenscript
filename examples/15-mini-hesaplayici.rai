@@ -4,7 +4,7 @@
 # provası. Lexer + Pratt parser + değerlendirici, hepsi RaidenScript'te.
 # Sorulan soru: "bu dille 100+ satırlık gerçek bir program yaşanır mı?"
 
-use std.math
+import std.math
 
 # =============== 1. LEXER ===============
 

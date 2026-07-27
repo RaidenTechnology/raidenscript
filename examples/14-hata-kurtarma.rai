@@ -1,6 +1,6 @@
 # Hata hiyerarşisi ve kurtarma stratejileri
 
-use std.json
+import std.json
 
 # --- Hata hiyerarşisi ---
 

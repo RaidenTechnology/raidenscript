@@ -87,7 +87,7 @@ void Parser::synchronize() {
         switch (peek().kind) {
             case Tok::KwFn: case Tok::KwClass: case Tok::KwTrait: case Tok::KwIf:
             case Tok::KwWhile: case Tok::KwFor: case Tok::KwReturn: case Tok::KwTry:
-            case Tok::KwUse: case Tok::Dedent:
+            case Tok::KwImport: case Tok::Dedent:
                 return;
             default:
                 advance();
@@ -166,8 +166,8 @@ StmtPtr Parser::statement() {
 StmtPtr Parser::simpleStatement() {
     const Token& bas = peek();
 
-    if (check(Tok::KwUse)) {
-        return useStatement();
+    if (check(Tok::KwImport)) {
+        return importStatement();
     }
 
     if (match(Tok::KwBreak)) {
@@ -369,9 +369,9 @@ StmtPtr Parser::tryStatement() {
     return s;
 }
 
-StmtPtr Parser::useStatement() {
+StmtPtr Parser::importStatement() {
     const Token& bas = advance();
-    auto s = make<UseStmt>(bas.span);
+    auto s = make<ImportStmt>(bas.span);
 
     if (check(Tok::Str)) {
         s->path = advance().text;

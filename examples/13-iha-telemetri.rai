@@ -1,7 +1,7 @@
 # SUAS2026 İHA yer istasyonu — üçüncü host bağlayıcısı ('serial.*').
 # Sayısal ağırlıklı, gerçek zamanlı kod: dilin bu profildeki davranışı test ediliyor.
 
-use std.math
+import std.math
 
 class Telemetri:
     enlem: f64 = 0.0

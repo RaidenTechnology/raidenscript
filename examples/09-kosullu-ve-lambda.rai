@@ -1,6 +1,6 @@
 # Koşullu ifade ve çok satırlı lambda — gramere sonradan eklenen iki yapı
 
-use std.math
+import std.math
 
 # --- Koşullu ifade (ternary) ---
 # Sözdizimi: <deger> if <kosul> else <deger>

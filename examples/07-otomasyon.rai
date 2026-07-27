@@ -1,8 +1,8 @@
 # RaidenAI / Crimson otomasyon betiği.
 # 'sys.*' host bağlayıcısı — dosya, süreç, ağ.
 
-use std.json
-use std.math
+import std.json
+import std.math
 
 # --- Proje klasöründeki tüm .rai dosyalarının satır sayısını çıkar ---
 

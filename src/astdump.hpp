@@ -54,7 +54,7 @@ private:
     void visit(const FnDecl&) override;
     void visit(const ClassDecl&) override;
     void visit(const TraitDecl&) override;
-    void visit(const UseStmt&) override;
+    void visit(const ImportStmt&) override;
 
     void satir(std::string_view etiket, std::string ek = {});
     void alt(const Expr* e);

@@ -6,7 +6,7 @@
 namespace rs {
 namespace {
 
-// SPEC §7.2 — 'use' gerektirmeden hazır isimler. Kasıtlı olarak dar.
+// SPEC §7.2 — 'import' gerektirmeden hazır isimler. Kasıtlı olarak dar.
 constexpr std::array<std::string_view, 10> PRELUDE{
     "print", "len", "type", "int", "float", "str", "bool", "range", "assert", "Error",
 };
@@ -431,9 +431,9 @@ void Resolver::visit(const TraitDecl& s) {
     }
 }
 
-void Resolver::visit(const UseStmt& s) {
-    // 'use std.math'      -> 'math'
-    // 'use "a/b/rs-http"' -> 'rs-http' son parçası
+void Resolver::visit(const ImportStmt& s) {
+    // 'import std.math'      -> 'math'
+    // 'import "a/b/rs-http"' -> 'rs-http' son parçası
     // 'as j'              -> 'j'
     std::string ad = s.alias;
     if (ad.empty()) {

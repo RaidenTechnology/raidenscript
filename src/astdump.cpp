@@ -314,11 +314,11 @@ void AstDumper::visit(const TraitDecl& s) {
     }
 }
 
-void AstDumper::visit(const UseStmt& s) {
+void AstDumper::visit(const ImportStmt& s) {
     std::string ek = s.path;
     if (!s.version.empty()) { ek += " @ " + s.version; }
     if (!s.alias.empty()) { ek += " as " + s.alias; }
-    satir(s.isStd ? "use std" : "use repo", ek);
+    satir(s.isStd ? "import std" : "import repo", ek);
 }
 
 }  // namespace rs

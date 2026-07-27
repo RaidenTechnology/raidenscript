@@ -2,7 +2,7 @@
 # 'game.*' host tarafından sağlanır, dilin parçası DEĞİLDİR.
 # Dil çekirdeği küçük kalır; güç bağlayıcıdan gelir.
 
-use std.math
+import std.math
 
 # --- Yeni silah tanımı ---
 

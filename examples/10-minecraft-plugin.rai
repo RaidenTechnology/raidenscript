@@ -3,7 +3,7 @@
 # Aynı dilin bir tarayıcı oyununa da bir Minecraft sunucusuna da girebilmesi
 # gömme tezinin asıl kanıtı.
 
-use std.math
+import std.math
 
 # --- Özel yetenek: Yıldırım Darbesi ---
 

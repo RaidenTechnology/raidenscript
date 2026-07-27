@@ -1231,7 +1231,7 @@ void Interpreter::visit(const TraitDecl& s) {
     env_->define(s.name, cls);
 }
 
-// Yerleşik std modülleri. Repo bazlı 'use' Faz 4'te gelecek; bunlar dilin
+// Yerleşik std modülleri. Repo bazlı 'import' Faz 4'te gelecek; bunlar dilin
 // kendi kütüphanesi, ağdan çözülmez.
 Value Interpreter::stdModul(const std::string& yol) {
     if (yol != "std.math") {
@@ -1296,7 +1296,7 @@ Value Interpreter::stdModul(const std::string& yol) {
     return m;
 }
 
-void Interpreter::visit(const UseStmt& s) {
+void Interpreter::visit(const ImportStmt& s) {
     std::string ad = s.alias;
     if (ad.empty()) {
         const char ayrac = s.isStd ? '.' : '/';

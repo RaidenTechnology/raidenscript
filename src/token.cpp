@@ -24,6 +24,7 @@ constexpr std::array<std::pair<std::string_view, Tok>, 32> KEYWORDS{{
     {"fn", Tok::KwFn},
     {"for", Tok::KwFor},
     {"if", Tok::KwIf},
+    {"import", Tok::KwImport},
     {"in", Tok::KwIn},
     {"is", Tok::KwIs},
     {"nil", Tok::KwNil},
@@ -38,7 +39,6 @@ constexpr std::array<std::pair<std::string_view, Tok>, 32> KEYWORDS{{
     {"trait", Tok::KwTrait},
     {"true", Tok::KwTrue},
     {"try", Tok::KwTry},
-    {"use", Tok::KwUse},
     {"view", Tok::KwView},
     {"while", Tok::KwWhile},
 }};
@@ -78,7 +78,7 @@ std::string_view tokLexeme(Tok t) noexcept {
         case Tok::KwClass:      return "class";
         case Tok::KwTrait:      return "trait";
         case Tok::KwView:       return "view";
-        case Tok::KwUse:        return "use";
+        case Tok::KwImport:     return "import";
         case Tok::KwAs:         return "as";
         case Tok::KwOuter:      return "outer";
         case Tok::KwIf:         return "if";

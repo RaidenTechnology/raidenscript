@@ -167,7 +167,7 @@ struct MapLit : ExprNode<MapLit> {
 struct ExprStmt;  struct AssignStmt; struct Block;     struct IfStmt;
 struct WhileStmt; struct ForStmt;    struct BreakStmt; struct ContinueStmt;
 struct PassStmt;  struct ReturnStmt; struct ThrowStmt; struct TryStmt;
-struct FnDecl;    struct ClassDecl;  struct TraitDecl; struct UseStmt;
+struct FnDecl;    struct ClassDecl;  struct TraitDecl; struct ImportStmt;
 
 struct StmtVisitor {
     virtual ~StmtVisitor() = default;
@@ -186,7 +186,7 @@ struct StmtVisitor {
     virtual void visit(const FnDecl&) = 0;
     virtual void visit(const ClassDecl&) = 0;
     virtual void visit(const TraitDecl&) = 0;
-    virtual void visit(const UseStmt&) = 0;
+    virtual void visit(const ImportStmt&) = 0;
 };
 
 struct Stmt {
@@ -278,7 +278,7 @@ struct TraitDecl : StmtNode<TraitDecl> {
     std::vector<Sig> methods;
 };
 
-struct UseStmt : StmtNode<UseStmt> {
+struct ImportStmt : StmtNode<ImportStmt> {
     std::string path;      // "std.math" veya "github.com/x/y"
     std::string alias;     // 'as j' — boş olabilir
     std::string version;   // '@ "v0.3.1"' — boş olabilir

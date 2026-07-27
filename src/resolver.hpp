@@ -109,7 +109,7 @@ private:
     void visit(const FnDecl&) override;
     void visit(const ClassDecl&) override;
     void visit(const TraitDecl&) override;
-    void visit(const UseStmt&) override;
+    void visit(const ImportStmt&) override;
 
     const Source* src_;
     Diagnostics* diag_;

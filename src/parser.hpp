@@ -54,7 +54,7 @@ private:
     StmtPtr whileStatement();
     StmtPtr forStatement();
     StmtPtr tryStatement();
-    StmtPtr useStatement();
+    StmtPtr importStatement();
     StmtPtr functionDecl(std::vector<Decorator> dekoratorler, bool isAsync);
     StmtPtr classDecl();
     StmtPtr traitDecl();

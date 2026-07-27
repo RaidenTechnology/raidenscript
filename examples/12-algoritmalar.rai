@@ -1,7 +1,7 @@
 # Algoritmalar — gerçek kodda ergonomi testi.
 # Buradaki amaç dilin "yazarken ne kadar yorduğunu" ölçmek.
 
-use std.math
+import std.math
 
 # --- Kabarcık sıralama (bilerek elle, dilin döngü yükünü görmek için) ---
 

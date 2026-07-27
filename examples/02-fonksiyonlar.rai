@@ -1,6 +1,6 @@
 # Fonksiyonlar, kapanışlar, özyineleme
 
-use std.math          # sqrt prelude'da DEĞİL — matematik use ister
+import std.math          # sqrt prelude'da DEĞİL — matematik import ister
 
 fn selamla(ad):
     return f"Merhaba {ad}"
