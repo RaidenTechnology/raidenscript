@@ -205,6 +205,23 @@ fn nadirlikDuzeyi(ad: str) -> int:
         i = i + 1
     return -1
 
+# ULTRA büyüler turkuaz. Nadirlik merdiveninin tepesiyle (Eşsiz) aynı renk --
+# çünkü ULTRA ayrı bir merdiven değil, o basamağın oyun içindeki adı.
+ULTRA_RENK = "§b"
+ULTRA_ETIKET = " §b✦ ULTRA"
+
+fn buyuRengi(buyu) -> str:
+    if buyu["ultra"]:
+        return ULTRA_RENK
+    return nadirlikRengi(buyu["duzey"])
+
+# Azami seviyedeki büyü KOYU yazılıyor: aynı renk, kalın. Oyuncu listeye
+# bakınca hangisini bitirdiğini okumadan görüyor.
+fn koyuMu(buyu, seviye: int) -> str:
+    if seviye >= buyu["maks"]:
+        return "§l"
+    return ""
+
 fn nadirlikRengi(duzey: int) -> str:
     if duzey < 0 or duzey >= len(NADIRLIK_RENKLER):
         return "§7"
@@ -224,65 +241,75 @@ fn nadirlikRengi(duzey: int) -> str:
 BUYULER = [
     { "id": "keskinlik", "ad": "Keskinlik", "duzey": 0, "tur": "silah", "maks": 5, "taban": 3,
       "ikon": "IRON_SWORD", "aciklama": "Kesici yüzü inceltir.",
-      "etkiler": [ { "stat": "STRENGTH", "deger": 4.0 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "STRENGTH", "deger": 4.0 } ], "cakisir": [], "ultra": false },
 
     { "id": "saglamlik", "ad": "Sağlamlık", "duzey": 0, "tur": "zirh", "maks": 5, "taban": 3,
       "ikon": "IRON_CHESTPLATE", "aciklama": "Dokumayı sıkılaştırır.",
-      "etkiler": [ { "stat": "HEALTH", "deger": 10.0 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "HEALTH", "deger": 10.0 } ], "cakisir": [], "ultra": false },
 
     { "id": "kanatma", "ad": "Kanatma", "duzey": 1, "tur": "silah", "maks": 4, "taban": 5,
       "ikon": "REDSTONE", "aciklama": "Yaralar geç kapanır. Yalnızca canavarlara.",
-      "etkiler": [ { "stat": "MONSTER_DAMAGE", "deger": 6.0 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "MONSTER_DAMAGE", "deger": 6.0 } ], "cakisir": [], "ultra": false },
 
     { "id": "celikDeri", "ad": "Çelik Deri", "duzey": 1, "tur": "zirh", "maks": 4, "taban": 5,
       "ikon": "IRON_INGOT", "aciklama": "Deriyi çelikle besler.",
-      "etkiler": [ { "stat": "DEFENSE", "deger": 5.0 } ], "cakisir": [ "ejderKalkani" ] },
+      "etkiler": [ { "stat": "DEFENSE", "deger": 5.0 } ], "cakisir": [ "ejderKalkani" ], "ultra": false },
 
     { "id": "nisanci", "ad": "Nişancı", "duzey": 2, "tur": "silah", "maks": 3, "taban": 9,
       "ikon": "SPECTRAL_ARROW", "aciklama": "Zayıf noktayı bulma alışkanlığı.",
-      "etkiler": [ { "stat": "CRIT_CHANCE", "deger": 4.0 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "CRIT_CHANCE", "deger": 4.0 } ], "cakisir": [], "ultra": false },
 
     { "id": "ceviklik", "ad": "Çeviklik", "duzey": 2, "tur": "zirh", "maks": 3, "taban": 9,
       "ikon": "FEATHER", "aciklama": "Ağırlığı taşımayı öğretir.",
-      "etkiler": [ { "stat": "SPEED", "deger": 3.0 } ], "cakisir": [ "zamanBukucu" ] },
+      "etkiler": [ { "stat": "SPEED", "deger": 3.0 } ], "cakisir": [ "zamanBukucu" ], "ultra": false },
 
     { "id": "infaz", "ad": "İnfaz", "duzey": 3, "tur": "silah", "maks": 3, "taban": 15,
       "ikon": "NETHERITE_SCRAP", "aciklama": "İsabet eden vuruş daha derin iner.",
-      "etkiler": [ { "stat": "CRIT_DAMAGE", "deger": 12.0 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "CRIT_DAMAGE", "deger": 12.0 } ], "cakisir": [], "ultra": false },
 
     { "id": "bilgelik", "ad": "Bilgelik", "duzey": 3, "tur": "hepsi", "maks": 3, "taban": 15,
       "ikon": "ENCHANTED_BOOK", "aciklama": "Zihni genişletir, mana havuzunu büyütür.",
-      "etkiler": [ { "stat": "INTELLIGENCE", "deger": 25.0 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "INTELLIGENCE", "deger": 25.0 } ], "cakisir": [], "ultra": false },
 
     { "id": "firtina", "ad": "Fırtına", "duzey": 4, "tur": "silah", "maks": 2, "taban": 25,
       "ikon": "SUGAR", "aciklama": "Vuruşlar arasındaki nefesi kısaltır.",
-      "etkiler": [ { "stat": "SALDIRI_HIZI", "deger": 8.0 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "SALDIRI_HIZI", "deger": 8.0 } ], "cakisir": [], "ultra": false },
 
     { "id": "uzunKol", "ad": "Uzun Kol", "duzey": 4, "tur": "silah", "maks": 2, "taban": 25,
       "ikon": "STICK", "aciklama": "Erişimi bir adım öteye taşır.",
-      "etkiler": [ { "stat": "SALDIRI_MENZILI", "deger": 0.6 } ], "cakisir": [] },
+      "etkiler": [ { "stat": "SALDIRI_MENZILI", "deger": 0.6 } ], "cakisir": [], "ultra": false },
 
     { "id": "yildirimOfkesi", "ad": "Yıldırım Öfkesi", "duzey": 5, "tur": "silah", "maks": 2, "taban": 40,
       "ikon": "LIGHTNING_ROD", "aciklama": "Çeliğe yıldırım hafızası işler.",
       "etkiler": [ { "stat": "STRENGTH", "deger": 15.0 }, { "stat": "CRIT_DAMAGE", "deger": 20.0 } ],
-      "cakisir": [ "keskinlik", "raidenMuhru" ] },
+      "cakisir": [ "keskinlik", "raidenMuhru" ], "ultra": false },
 
     { "id": "ejderKalkani", "ad": "Ejder Kalkanı", "duzey": 5, "tur": "zirh", "maks": 2, "taban": 40,
       "ikon": "DRAGON_BREATH", "aciklama": "Pul üstüne pul bindirir.",
       "etkiler": [ { "stat": "DEFENSE", "deger": 20.0 }, { "stat": "HEALTH", "deger": 40.0 } ],
-      "cakisir": [ "celikDeri" ] },
+      "cakisir": [ "celikDeri" ], "ultra": false },
 
     { "id": "raidenMuhru", "ad": "Raiden Mührü", "duzey": 6, "tur": "silah", "maks": 1, "taban": 80,
       "ikon": "NETHER_STAR", "aciklama": "Mühür bir kez basılır ve silah bir daha eskisi olmaz.",
       "etkiler": [ { "stat": "STRENGTH", "deger": 40.0 }, { "stat": "CRIT_DAMAGE", "deger": 50.0 },
                    { "stat": "SALDIRI_HIZI", "deger": 10.0 } ],
-      "cakisir": [ "yildirimOfkesi" ] },
+      "cakisir": [ "yildirimOfkesi" ], "ultra": true },
 
     { "id": "zamanBukucu", "ad": "Zaman Bükücü", "duzey": 6, "tur": "zirh", "maks": 1, "taban": 80,
       "ikon": "CLOCK", "aciklama": "Adımların arasındaki zamanı kısaltır.",
       "etkiler": [ { "stat": "SPEED", "deger": 12.0 }, { "stat": "SALDIRI_HIZI", "deger": 15.0 },
                    { "stat": "HEALTH", "deger": 60.0 } ],
-      "cakisir": [ "ceviklik" ] },
+      "cakisir": [ "ceviklik" ], "ultra": true },
+
+    { "id": "sonsuzKesik", "ad": "Sonsuz Kesik", "duzey": 6, "tur": "silah", "maks": 1, "taban": 80,
+      "ikon": "END_CRYSTAL", "aciklama": "Kesik kapanmadan bir yenisi açılır.",
+      "etkiler": [ { "stat": "CRIT_CHANCE", "deger": 25.0 }, { "stat": "CRIT_DAMAGE", "deger": 60.0 } ],
+      "cakisir": [ "nisanci" ], "ultra": true },
+
+    { "id": "olumsuzluk", "ad": "Ölümsüzlük", "duzey": 6, "tur": "zirh", "maks": 1, "taban": 80,
+      "ikon": "TOTEM_OF_UNDYING", "aciklama": "Bedenin yıkılmayı reddeder.",
+      "etkiler": [ { "stat": "HEALTH", "deger": 150.0 }, { "stat": "DEFENSE", "deger": 40.0 } ],
+      "cakisir": [ "saglamlik" ], "ultra": true },
 ]
 
 
@@ -352,6 +379,13 @@ fn uygunMu(uuid: str, buyu, esyaTur: str, esyaDuzey: int) -> str:
     if mevcut >= buyu["maks"]:
         return "Azami seviyede."
 
+    # Bir eşyaya YALNIZCA BİR Ultra büyü basılır. Yükseltme bu kurala girmiyor,
+    # sadece yeni bir Ultra basmak.
+    if buyu["ultra"] and mevcut == 0:
+        for o in BUYULER:
+            if o["ultra"] and o["id"] != buyu["id"] and int(mc.girisBuyuSeviye(uuid, o["id"])) > 0:
+                return f"{o['ad']} basılı — bir eşyaya tek ULTRA."
+
     for c in buyu["cakisir"]:
         if int(mc.girisBuyuSeviye(uuid, c)) > 0:
             other = buyuBul(c)
@@ -417,18 +451,20 @@ fn masayiCiz(uuid: str):
 fn buyuDugmesiCiz(uuid: str, yuva: int, buyu, esyaTur: str, esyaDuzey: int, xp: int):
     mevcut = int(mc.girisBuyuSeviye(uuid, buyu["id"]))
     sebep = uygunMu(uuid, buyu, esyaTur, esyaDuzey)
-    renk = nadirlikRengi(buyu["duzey"])
+    renk = buyuRengi(buyu)
+    etiket = ULTRA_ETIKET if buyu["ultra"] else ""
 
-    baslik = f"{renk}{buyu['ad']}"
+    baslik = f"{renk}{buyu['ad']}{etiket}"
     if mevcut > 0:
-        baslik = f"{renk}{buyu['ad']} {romen(mevcut)}"
+        baslik = f"{renk}{koyuMu(buyu, mevcut)}{buyu['ad']} {romen(mevcut)}{etiket}"
 
     ikon = buyu["ikon"]
     if sebep != "":
         ikon = "GRAY_DYE"
 
     mc.guiEsya(uuid, yuva, ikon, baslik, 1)
-    mc.guiLore(uuid, yuva, f"§8{NADIRLIK_ADLARI[buyu['duzey']]} büyü")
+    tur = "§b✦ ULTRA büyü" if buyu["ultra"] else f"§8{NADIRLIK_ADLARI[buyu['duzey']]} büyü"
+    mc.guiLore(uuid, yuva, tur)
     mc.guiLore(uuid, yuva, f"§7{buyu['aciklama']}")
     mc.guiLore(uuid, yuva, " ")
 
@@ -476,6 +512,77 @@ fn sayiYaz(d) -> str:
 #  BÜYÜLEME
 # ============================================================
 
+# ============================================================
+#  EŞYA ÜZERİNDEKİ BÜYÜ BLOĞU
+# ============================================================
+#
+# Blok sona EKLENMİYOR: statlarla "Yetenek:" bloğunun arasına giriyor. Kılıç
+# lore'unun düzeni Hasar → statlar → Yetenek → nadirlik; büyüler statların
+# hemen ardında okunmalı ki oyuncu eşyanın gücünü tek yerde görsün.
+#
+# Bloğun yeri ve uzunluğu eşyanın kendi defterine (mc.girisVeri*) yazılıyor, o
+# yüzden yeniden çizerken görünür bir işaretçi satırına gerek kalmıyor.
+
+fn blokYeri(uuid: str) -> int:
+    n = int(mc.girisLoreSayisi(uuid))
+    i = 0
+    while i < n:
+        if mc.girisLoreSatir(uuid, i).contains("Yetenek:"):
+            # "Yetenek:" satırının önünde bir boş satır var; bloğu onun da önüne al.
+            return i - 1 if i > 0 else 0
+        i = i + 1
+    # Yetenek yoksa: sondaki boş satır + nadirlik ikilisinin önüne.
+    if n >= 2:
+        return n - 2
+    return n
+
+fn buyuSatirlari(uuid: str) -> list:
+    satirlar = []
+    takili = []
+    for b in BUYULER:
+        if int(mc.girisBuyuSeviye(uuid, b["id"])) > 0:
+            takili.push(b)
+    if len(takili) == 0:
+        return satirlar
+
+    satirlar.push("")
+    satirlar.push(f"§7Büyüler §8({len(takili)})")
+
+    for b in takili:
+        sv = int(mc.girisBuyuSeviye(uuid, b["id"]))
+        renk = buyuRengi(b)
+        koyu = koyuMu(b, sv)
+        etiket = ULTRA_ETIKET if b["ultra"] else ""
+        # Başlık: ad + seviye (azamide kalın), ardından açıklama ve etkiler.
+        satirlar.push(f"{renk}{koyu}{b['ad']} {romen(sv)}{etiket}")
+        satirlar.push(f"§7  {b['aciklama']}")
+        parcalar = []
+        for e in b["etkiler"]:
+            parcalar.push(f"{statAdi(e['stat'])} +{sayiYaz(e['deger'] * sv)}")
+        satirlar.push(f"§8  {parcalar.join(' · ')}")
+    return satirlar
+
+fn buyuLoresuCiz(uuid: str):
+    eskiAdet = int(mc.girisVeriOku(uuid, "loreAdet"))
+    if eskiAdet > 0:
+        mc.girisLoreSilAralik(uuid, int(mc.girisVeriOku(uuid, "loreBas")), eskiAdet)
+
+    satirlar = buyuSatirlari(uuid)
+    if len(satirlar) == 0:
+        mc.girisVeriYaz(uuid, "loreBas", 0)
+        mc.girisVeriYaz(uuid, "loreAdet", 0)
+        return 0
+
+    yer = blokYeri(uuid)
+    i = 0
+    while i < len(satirlar):
+        mc.girisLoreYaz(uuid, yer + i, satirlar[i])
+        i = i + 1
+    mc.girisVeriYaz(uuid, "loreBas", yer)
+    mc.girisVeriYaz(uuid, "loreAdet", len(satirlar))
+    return 0
+
+
 fn buyule(uuid: str, buyu):
     esyaTur = mc.girisTur(uuid)
     esyaDuzey = nadirlikDuzeyi(mc.girisNadirlik(uuid))
@@ -502,12 +609,11 @@ fn buyule(uuid: str, buyu):
 
     mc.girisBuyuYaz(uuid, buyu["id"], hedef)
 
-    # Lore satırı: eski seviyeyi sil, yenisini yaz.
-    renk = nadirlikRengi(buyu["duzey"])
-    if mevcut > 0:
-        mc.girisLoreSil(uuid, buyu["ad"])
-    mc.girisLoreEkle(uuid, f"{renk}{buyu['ad']} {romen(hedef)}")
+    # Blok tümüyle yeniden çiziliyor: tek büyünün satırını yamamak yerine
+    # bütünü kurmak, sıralamayı ve sayacı kendiliğinden doğru tutuyor.
+    buyuLoresuCiz(uuid)
 
+    renk = buyuRengi(buyu)
     mc.ses(uuid, "block.enchantment_table.use", 1.0, 1.0)
     if buyu["duzey"] >= 5:
         mc.ses(uuid, "entity.ender_dragon.growl", 0.5, 1.4)

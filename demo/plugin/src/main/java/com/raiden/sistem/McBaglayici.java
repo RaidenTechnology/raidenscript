@@ -98,9 +98,25 @@ public final class McBaglayici {
         return (it == null || it.getType() == Material.AIR) ? null : it;
     }
 
+    /*
+     * NamespacedKey yalnızca [a-z0-9/._-] kabul ediyor. Betikteki büyü id'leri
+     * camelCase ("celikDeri", "raidenMuhru") ve bunlar doğrudan anahtar yapılınca
+     * IllegalArgumentException atıyor -- gerçek sunucuda böyle yakalandı:
+     *
+     *   Invalid key. Must be [a-z0-9/._-]: rai_buyu_celikDeri
+     *
+     * Sonuç sessiz değildi ama görünmezdi: köprünün try/catch'i istisnayı yutup
+     * 0 döndürüyordu, yani o büyüler "hiç takılı değil" gibi davranıyordu.
+     * Çözüm burada, betikte değil -- id'leri Java'nın kısıtına uydurmak için
+     * betiği çirkinleştirmek yanlış olurdu.
+     */
+    private static String pdcAd(String ham) {
+        return ham.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9/._-]", "_");
+    }
+
     private static NamespacedKey anahtar(String ad) {
         @SuppressWarnings("deprecation")
-        NamespacedKey k = new NamespacedKey(RPG_NS, ad);
+        NamespacedKey k = new NamespacedKey(RPG_NS, pdcAd(ad));
         return k;
     }
 
@@ -322,6 +338,73 @@ public final class McBaglayici {
             it.setItemMeta(meta);
             return 1.0;
         });
+        /* --- lore'u ORTASINDAN düzenleme ---
+         * Büyü bloğu sona eklenmiyor, statlarla yeteneğin ARASINA giriyor. Bunun
+         * için betiğin satırları okuyup araya yazabilmesi gerekiyor. Nereye
+         * gireceğine ve neyin silineceğine betik karar veriyor; burası sadece
+         * listeyi taşıyor. */
+        m.put("girisLoreSayisi", a -> {
+            ItemStack it = giris(RaidenScript.metin(a, 0));
+            if (it == null || !it.hasItemMeta()) return 0.0;
+            List<Component> lore = it.getItemMeta().lore();
+            return lore == null ? 0.0 : lore.size();
+        });
+        m.put("girisLoreSatir", a -> {
+            ItemStack it = giris(RaidenScript.metin(a, 0));
+            if (it == null || !it.hasItemMeta()) return "";
+            List<Component> lore = it.getItemMeta().lore();
+            int i = RaidenScript.tam(a, 1);
+            if (lore == null || i < 0 || i >= lore.size()) return "";
+            return duzMetin(lore.get(i));
+        });
+        m.put("girisLoreYaz", a -> {
+            ItemStack it = giris(RaidenScript.metin(a, 0));
+            if (it == null) return 0.0;
+            ItemMeta meta = it.getItemMeta();
+            List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+            int i = Math.max(0, Math.min(lore.size(), RaidenScript.tam(a, 1)));
+            lore.add(i, bilesen(RaidenScript.metin(a, 2)));
+            meta.lore(lore);
+            it.setItemMeta(meta);
+            return 1.0;
+        });
+        m.put("girisLoreSilAralik", a -> {
+            ItemStack it = giris(RaidenScript.metin(a, 0));
+            if (it == null || !it.hasItemMeta()) return 0.0;
+            ItemMeta meta = it.getItemMeta();
+            List<Component> lore = meta.lore();
+            if (lore == null) return 0.0;
+            int bas = RaidenScript.tam(a, 1);
+            int adet = RaidenScript.tam(a, 2);
+            if (bas < 0 || adet <= 0 || bas >= lore.size()) return 0.0;
+            int son = Math.min(lore.size(), bas + adet);
+            List<Component> yeni = new ArrayList<>(lore.subList(0, bas));
+            yeni.addAll(lore.subList(son, lore.size()));
+            meta.lore(yeni);
+            it.setItemMeta(meta);
+            return son - bas;
+        });
+
+        /* Betiğin kendi defteri: eşya üzerinde tam sayı saklar. Büyü bloğunun
+         * lore'da nerede başladığını ve kaç satır tuttuğunu böyle hatırlıyor --
+         * görünür bir işaretçi satırı koymaya gerek kalmıyor. */
+        m.put("girisVeriOku", a -> {
+            ItemStack it = giris(RaidenScript.metin(a, 0));
+            if (it == null || !it.hasItemMeta()) return 0.0;
+            Integer v = it.getItemMeta().getPersistentDataContainer()
+                    .get(anahtar("rai_" + RaidenScript.metin(a, 1)), PersistentDataType.INTEGER);
+            return v == null ? 0.0 : v;
+        });
+        m.put("girisVeriYaz", a -> {
+            ItemStack it = giris(RaidenScript.metin(a, 0));
+            if (it == null) return 0.0;
+            ItemMeta meta = it.getItemMeta();
+            meta.getPersistentDataContainer().set(anahtar("rai_" + RaidenScript.metin(a, 1)),
+                    PersistentDataType.INTEGER, RaidenScript.tam(a, 2));
+            it.setItemMeta(meta);
+            return 1.0;
+        });
+
         m.put("girisLoreSil", a -> {
             ItemStack it = giris(RaidenScript.metin(a, 0));
             if (it == null || !it.hasItemMeta()) return 0.0;
