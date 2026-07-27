@@ -37,11 +37,11 @@
     // Ölçüm, iddiayı yerinde tutmak için: sayfayı kuran betiğin gerçekten ne
     // kadar sürdüğü konsolda görünsün.
     console.log(
-      '%cRAIDEN PARÇA%c  yükleme ' + (tEval - t0).toFixed(0) + ' ms · ' +
-      'betik derleme ' + (tCiz - tEval).toFixed(1) + ' ms · ' +
-      'sayfa kurulumu ' + (tSon - tCiz).toFixed(1) + ' ms · ' +
-      baglayici.dugumSayisi() + ' düğüm · ' +
-      baglayici.hataSayisi() + ' host hatası',
+      '%cRAIDEN PARTS%c  load ' + (tEval - t0).toFixed(0) + ' ms · ' +
+      'script compile ' + (tCiz - tEval).toFixed(1) + ' ms · ' +
+      'page build ' + (tSon - tCiz).toFixed(1) + ' ms · ' +
+      baglayici.dugumSayisi() + ' nodes · ' +
+      baglayici.hataSayisi() + ' host errors',
       'font-weight:700;color:#2de2c8', 'color:#8b93a8'
     );
 
@@ -60,7 +60,7 @@
 
   baslat().catch((e) => {
     const k = $('yukleniyor');
-    k.textContent = 'Yüklenemedi: ' + e.message;
+    k.textContent = 'Failed to load: ' + e.message;
     console.error(e);
   });
 })();

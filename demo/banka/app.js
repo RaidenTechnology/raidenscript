@@ -44,7 +44,7 @@
     temizle: (bolge) => {
       const hedef = $(BOLGELER[bolge]);
       if (!hedef) {
-        console.error('ui.temizle: bilinmeyen bölge -> ' + bolge);
+        console.error('ui.temizle: unknown region -> ' + bolge);
         return 0;
       }
       hedef.replaceChildren();
@@ -54,7 +54,7 @@
     // Tek bir metin alanını doldur.
     metin: (alan, deger) => {
       if (ALANLAR.indexOf(alan) < 0) {
-        console.error('ui.metin: bilinmeyen alan -> ' + alan);
+        console.error('ui.metin: unknown field -> ' + alan);
         return 0;
       }
       const d = $(alan);
@@ -132,7 +132,7 @@
       return vm.call(fn, args || []);
     } catch (e) {
       // Betikten kaçan hata = kural boşluğu. Yutma, göster.
-      ui.durum('hata', 'Betik hatası', String(e.message).split('\n')[0]);
+      ui.durum('hata', 'Script error', String(e.message).split('\n')[0]);
       console.error(e);
       return -1;
     }
@@ -147,14 +147,14 @@
     alan.classList.remove('gecerli', 'gecersiz');
     if (kod === 1) {
       alan.classList.add('gecerli');
-      ipucu.textContent = 'IBAN geçerli';
+      ipucu.textContent = 'IBAN is valid';
       ipucu.className = 'ipucu arti';
     } else if (kod === 2) {
       alan.classList.add('gecersiz');
-      ipucu.textContent = 'Kontrol basamağı tutmuyor';
+      ipucu.textContent = 'Check digits do not match';
       ipucu.className = 'ipucu eksi';
     } else if (kod === 3) {
-      ipucu.textContent = 'TR IBAN 26 karakterdir';
+      ipucu.textContent = 'a TR IBAN is 26 characters';
       ipucu.className = 'ipucu soluk';
     } else {
       ipucu.textContent = '';
@@ -169,7 +169,7 @@
     vm = RS.open({ ui: ui });
 
     const kaynak = await fetch('banka.rai').then((r) => {
-      if (!r.ok) throw new Error('banka.rai okunamadı (' + r.status + ')');
+      if (!r.ok) throw new Error('could not read banka.rai (' + r.status + ')');
       return r.text();
     });
 
@@ -196,11 +196,11 @@
       });
     });
 
-    console.log('RaidenScript banka demosu hazır — mantığın tamamı banka.rai içinde');
+    console.log('RaidenScript bank demo ready — all of the logic lives in banka.rai');
   }
 
   baslat().catch((e) => {
-    $('yukleniyor').textContent = 'Yüklenemedi: ' + e.message;
+    $('yukleniyor').textContent = 'Failed to load: ' + e.message;
     console.error(e);
   });
 })();

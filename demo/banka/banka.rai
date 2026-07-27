@@ -48,7 +48,7 @@ fn paraYaz(kurus: int) -> str:
 fn kurusCevir(metin: str) -> int:
     ham = metin.trim().replaceAll(" ", "")
     if ham == "":
-        throw Error("tutar girilmedi")
+        throw Error("no amount entered")
     s = ham.replaceAll(".", "").replaceAll(",", ".") if ham.contains(",") else ham
 
     tam = 0
@@ -60,12 +60,12 @@ fn kurusCevir(metin: str) -> int:
         k = s[i]
         if k == ".":
             if noktaVar:
-                throw Error(f"tutarda iki ondalık ayracı var: {metin}")
+                throw Error(f"two decimal separators in the amount: {metin}")
             noktaVar = true
         else:
             b = RAKAMLAR.indexOf(k)
             if b < 0:
-                throw Error(f"tutarda sayı olmayan karakter: '{k}'")
+                throw Error(f"non-numeric character in the amount: '{k}'")
             if noktaVar:
                 if basamakSayisi < 2:
                     ondalik = ondalik * 10 + b
@@ -224,14 +224,14 @@ class Musteri:
 
     fn dogrula(self, girilen: str) -> bool:
         if self.bloke:
-            throw Error("hesap bloke — 3 hatalı PIN girişi yapıldı")
+            throw Error("account locked - three wrong PIN attempts")
         if girilen == self.pin:
             self.yanlisPin = 0
             return true
         self.yanlisPin = self.yanlisPin + 1
         if self.yanlisPin >= 3:
             self.bloke = true
-            throw Error("hesap bloke — 3 hatalı PIN girişi yapıldı")
+            throw Error("account locked - three wrong PIN attempts")
         return false
 
 class Banka:
@@ -245,7 +245,7 @@ class Banka:
 
     fn hesapEkle(self, hesap):
         if not ibanGecerli(hesap.iban):
-            throw Error(f"kurulum hatası: geçersiz IBAN {ibanBicimle(hesap.iban)}")
+            throw Error(f"setup error: invalid IBAN {ibanBicimle(hesap.iban)}")
         self.hesaplar[hesap.iban] = hesap
         return hesap
 
@@ -264,30 +264,30 @@ class Banka:
     # olamaz, yani yarım kalmış transfer yok.
     fn transfer(self, kaynak, hedefIban: str, tutar: int, aciklama: str, tarih: str):
         if tutar <= 0:
-            throw Error("tutar sıfırdan büyük olmalı")
+            throw Error("amount must be greater than zero")
         if not ibanGecerli(hedefIban):
-            throw Error("alıcı IBAN geçersiz — kontrol basamağı (mod-97) tutmuyor")
+            throw Error("payee IBAN is invalid - the mod-97 check digits do not match")
         if hedefIban.replaceAll(" ", "").upper() == kaynak.iban:
-            throw Error("gönderen ve alıcı aynı hesap")
+            throw Error("sender and payee are the same account")
 
         hedef = self.bul(hedefIban)
         if hedef != nil and hedef.birim != kaynak.birim:
-            throw Error(f"para birimi uyuşmuyor — {kaynak.birim} hesaptan {hedef.birim} hesaba doğrudan transfer yapılamaz")
+            throw Error(f"currency mismatch - you cannot transfer directly from a {kaynak.birim} account to a {hedef.birim} account")
 
         ucret = 0 if hedef != nil else self.eftUcreti
         toplam = tutar + ucret
 
         kalanLimit = self.gunlukLimit - kaynak.gunlukCikis
         if toplam > kalanLimit:
-            throw Error(f"günlük transfer limiti aşıldı — kalan limit {paraYaz(kalanLimit)} TRY")
+            throw Error(f"daily transfer limit exceeded - {paraYaz(kalanLimit)} TRY remaining")
         if toplam > kaynak.bakiye:
             throw Error(f"yetersiz bakiye — {paraYaz(kaynak.bakiye)} var, {paraYaz(toplam)} gerekiyor")
 
-        kaynak.uygula(tarih, "ÇIKIŞ", -tutar, aciklama)
+        kaynak.uygula(tarih, "DEBIT", -tutar, aciklama)
         if ucret > 0:
-            kaynak.uygula(tarih, "ÜCRET", -ucret, "EFT masrafı")
+            kaynak.uygula(tarih, "FEE", -ucret, "wire fee")
         if hedef != nil:
-            hedef.uygula(tarih, "GİRİŞ", tutar, f"{aciklama} (havale)")
+            hedef.uygula(tarih, "CREDIT", tutar, f"{aciklama} (incoming)")
 
         return {"ucret": ucret, "kalan": kaynak.bakiye, "dahili": hedef != nil}
 
@@ -298,16 +298,16 @@ class Banka:
 
 banka = Banka("RAIDEN BANK", "0061")
 
-vadesiz = banka.hesapEkle(Hesap("TR330006100519786457841326", "Vadesiz Hesap", "TRY", 980060))
-birikim = banka.hesapEkle(Hesap("TR020006100519786457841399", "Birikim Hesabı", "TRY", 15000000))
-dolar   = banka.hesapEkle(Hesap("TR260006100519786457841355", "Döviz Hesabı", "USD", 320000))
-ayse    = banka.hesapEkle(Hesap("TR910006200119786457841426", "Ayşe Demir", "TRY", 89000))
+vadesiz = banka.hesapEkle(Hesap("TR330006100519786457841326", "Current Account", "TRY", 980060))
+birikim = banka.hesapEkle(Hesap("TR020006100519786457841399", "Savings Account", "TRY", 15000000))
+dolar   = banka.hesapEkle(Hesap("TR260006100519786457841355", "FX Account", "USD", 320000))
+ayse    = banka.hesapEkle(Hesap("TR910006200119786457841426", "Alice Turner", "TRY", 89000))
 
-musteri = Musteri("4471029", "Emre Yıldırım", "8419")
+musteri = Musteri("4471029", "Ethan Wilder", "8419")
 musteri.hesaplar = [vadesiz, birikim, dolar]
 
-vadesiz.uygula("01.07.2026", "GİRİŞ", 3850000, "Maaş ödemesi")
-vadesiz.uygula("03.07.2026", "ÇIKIŞ", -47500, "Market alışverişi")
+vadesiz.uygula("01.07.2026", "CREDIT", 3850000, "Salary payment")
+vadesiz.uygula("03.07.2026", "DEBIT", -47500, "Groceries")
 vadesiz.gunuKapat()
 
 BUGUN = "27.07.2026"
@@ -353,7 +353,7 @@ fn ekstreCiz():
 
     giren = h.gecmis.filter((i) => i.tutar > 0).reduce((t, i) => t + i.tutar, 0)
     cikan = h.gecmis.filter((i) => i.tutar < 0).reduce((t, i) => t - i.tutar, 0)
-    ui.metin("ekstreOzet", f"{len(h.gecmis)} işlem · giren {paraYaz(giren)} · çıkan {paraYaz(cikan)}")
+    ui.metin("ekstreOzet", f"{len(h.gecmis)} entries · in {paraYaz(giren)} · out {paraYaz(cikan)}")
 
 fn projeksiyonCiz(oran, yil):
     h = seciliHesap()
@@ -371,7 +371,7 @@ fn projeksiyonCiz(oran, yil):
         # anlamı zaten bu.
         carpan = carpan * (1 + oran)
         bakiye = int(h.bakiye * carpan)
-        ui.projeksiyonSatiri(f"{y}. yıl", paraYaz(bakiye), f"+{paraYaz(bakiye - h.bakiye)}")
+        ui.projeksiyonSatiri(f"year {y}", paraYaz(bakiye), f"+{paraYaz(bakiye - h.bakiye)}")
         y = y + 1
 
 
@@ -391,10 +391,10 @@ fn girisYap():
     try:
         if not musteri.dogrula(pin):
             kalan = 3 - musteri.yanlisPin
-            ui.durum("hata", "PIN hatalı", f"{kalan} deneme hakkınız kaldı")
+            ui.durum("hata", "Wrong PIN", f"{kalan} attempts left")
             return 1
     catch e:
-        ui.durum("hata", "Giriş engellendi", e.message)
+        ui.durum("hata", "Sign-in blocked", e.message)
         return 2
 
     ui.metin("musteriAd", musteri.adSoyad)
@@ -403,7 +403,7 @@ fn girisYap():
     hesaplariCiz()
     ekstreCiz()
     projeksiyonCiz(0.415, 5)
-    ui.durum("ok", "Hoş geldiniz", musteri.adSoyad)
+    ui.durum("ok", "Welcome", musteri.adSoyad)
     return 0
 
 fn hesapSec(i):
@@ -420,17 +420,17 @@ fn transferYap():
     tutarMetni = ui.girdi("tutar")
     aciklama = ui.girdi("aciklama").trim()
     if aciklama == "":
-        aciklama = "Açıklama yok"
+        aciklama = "No description"
 
     try:
         tutar = kurusCevir(tutarMetni)
         fis = banka.transfer(seciliHesap(), hedefIban, tutar, aciklama, BUGUN)
-        yol = "Hesaplar arası" if fis.dahili else "EFT / Havale"
-        ucretMetni = "ücretsiz" if fis.ucret == 0 else f"ücret {paraYaz(fis.ucret)}"
-        ui.durum("ok", f"{paraYaz(tutar)} gönderildi",
+        yol = "Internal" if fis.dahili else "Wire transfer"
+        ucretMetni = "no fee" if fis.ucret == 0 else f"fee {paraYaz(fis.ucret)}"
+        ui.durum("ok", f"{paraYaz(tutar)} sent",
                  f"{yol} · {ucretMetni} · kalan bakiye {paraYaz(fis.kalan)}")
     catch e:
-        ui.durum("hata", "İşlem gerçekleştirilemedi", e.message)
+        ui.durum("hata", "Transfer failed", e.message)
         hesaplariCiz()
         return 1
 

@@ -1,12 +1,12 @@
-# RAIDEN PARÇA — mağazanın TAMAMI.
+# RAIDEN PARTS — the WHOLE store.
 #
-# Bu dosyada olanlar: katalog, fiyat biçimleme, indirim, stok, filtre, sıralama,
-# sepet matematiği, kargo eşiği, sistem kurucusunun uyumluluk kuralları (soket
-# eşleşmesi, güç bütçesi, darboğaz tahmini), sayfanın kurulumu ve HANGİ
-# ANİMASYONUN NE ZAMAN OYNAYACAĞI.
+# What lives here: the catalogue, price formatting, discounts, stock, filtering,
+# sorting, cart maths, the free-shipping threshold, the build checker's rules
+# (socket match, power budget, bottleneck estimate), the page layout, and WHICH
+# ANIMATION PLAYS WHEN.
 #
-# JavaScript'te olanlar: düğüm aç, metin yaz, sınıf tak, zaman çizelgesini
-# tarayıcıya devret. Tek bir mağaza kuralı orada değil.
+# What lives in JavaScript: open a node, write text, toggle a class, hand a
+# timeline to the browser. Not one store rule is over there.
 #
 # ANİMASYON İLKESİ: kare başına stil yazılmıyor. Zaman çizelgesi bir kez
 # bildiriliyor, oynatmayı tarayıcı üstleniyor (Web Animations API). Böylece
@@ -28,32 +28,17 @@ fn binlikAyir(n: int) -> str:
     i = len(metin) - 1
     while i >= 0:
         if sayac > 0 and sayac % 3 == 0:
-            sonuc = "." + sonuc
+            sonuc = "," + sonuc
         sonuc = metin[i] + sonuc
         sayac = sayac + 1
         i = i - 1
     return sonuc
 
-# Kuruş tutulur, ekranda lira gösterilir. Kayan noktalı para yok.
+# Money is kept in cents. No floating point anywhere near a price.
 fn paraYaz(kurus: int) -> str:
     kr = kurus % 100
     kurusMetni = f"{kr}" if kr >= 10 else f"0{kr}"
-    return f"{binlikAyir(kurus // 100)},{kurusMetni}"
-
-# Türkçe yüzde eki: "%66'sı", "%99'u", "%74'ü". Son rakamın OKUNUŞUNA göre
-# değişiyor; tek biçimli bir "'i" eki yanlış yazım üretiyor. Bu da bir metin
-# kuralı, yani betiğin işi — CSS bunu yapamaz.
-YUZDE_BIR = ["", "'i", "'si", "'ü", "'ü", "'i", "'sı", "'si", "'i", "'u"]
-YUZDE_ON  = ["", "'u", "'si", "'u", "'ı", "'si", "'ı", "'i", "'i", "'ı"]
-
-fn yuzdeEki(n: int) -> str:
-    if n >= 100:
-        return "'ü"
-    if n <= 0:
-        return "'ı"
-    if n % 10 != 0:
-        return YUZDE_BIR[n % 10]
-    return YUZDE_ON[n // 10]
+    return f"{binlikAyir(kurus // 100)}.{kurusMetni}"
 
 fn yuzdeYaz(bolum: int, tam: int) -> int:
     if tam <= 0:
@@ -68,80 +53,80 @@ fn yuzdeYaz(bolum: int, tam: int) -> int:
 # soket alanı uyumluluğun anahtarı: işlemci ile anakart aynı sokete oturmalı.
 # watt alanı güç bütçesinin, puan alanı darboğaz tahmininin girdisi.
 
-KATEGORILER = ["Hepsi", "Ekran Kartı", "İşlemci", "Bellek", "Depolama", "Anakart", "Güç"]
+KATEGORILER = ["All", "Graphics", "CPU", "Memory", "Storage", "Mainboard", "Power"]
 
 URUNLER = [
     { "ad": "Vanguard RTX 5080 OC", "marka": "Raiden", "kat": 1, "ikon": "▰",
-      "fiyat": 6499900, "eski": 7199900, "stok": 7, "watt": 360, "puan": 96, "soket": "-",
-      "etiket": "İNDİRİM", "ton": 0, "ozet": "16 GB GDDR7 · 3 fanlı buhar odası · 2.9 GHz" },
+      "fiyat": 129900, "eski": 149900, "stok": 7, "watt": 360, "puan": 96, "soket": "-",
+      "etiket": "SALE", "ton": 0, "ozet": "16 GB GDDR7 · triple-fan vapour chamber · 2.9 GHz" },
     { "ad": "Vanguard RTX 5070 Ti", "marka": "Raiden", "kat": 1, "ikon": "▰",
-      "fiyat": 3849900, "eski": 0, "stok": 12, "watt": 285, "puan": 84, "soket": "-",
-      "etiket": "", "ton": 0, "ozet": "16 GB GDDR7 · çift fan · sessiz kip" },
+      "fiyat": 79900, "eski": 0, "stok": 12, "watt": 285, "puan": 84, "soket": "-",
+      "etiket": "", "ton": 0, "ozet": "16 GB GDDR7 · dual fan · quiet mode" },
     { "ad": "Halcyon RX 9070 XT", "marka": "Halcyon", "kat": 1, "ikon": "▰",
-      "fiyat": 3199900, "eski": 3499900, "stok": 3, "watt": 304, "puan": 80, "soket": "-",
-      "etiket": "SON 3", "ton": 3, "ozet": "16 GB GDDR6 · 2.5 slot · ısı borulu" },
+      "fiyat": 64900, "eski": 72900, "stok": 3, "watt": 304, "puan": 80, "soket": "-",
+      "etiket": "LAST 3", "ton": 3, "ozet": "16 GB GDDR6 · 2.5 slot · heat-pipe cooled" },
     { "ad": "Vanguard RTX 5060", "marka": "Raiden", "kat": 1, "ikon": "▰",
-      "fiyat": 1549900, "eski": 0, "stok": 21, "watt": 145, "puan": 58, "soket": "-",
-      "etiket": "", "ton": 0, "ozet": "8 GB GDDR7 · tek fan · ITX uyumlu" },
+      "fiyat": 29900, "eski": 0, "stok": 21, "watt": 145, "puan": 58, "soket": "-",
+      "etiket": "", "ton": 0, "ozet": "8 GB GDDR7 · single fan · ITX friendly" },
 
     { "ad": "Zephyr 9950X", "marka": "Zephyr", "kat": 2, "ikon": "◫",
-      "fiyat": 2489900, "eski": 0, "stok": 9, "watt": 170, "puan": 98, "soket": "AM5",
-      "etiket": "YENİ", "ton": 1, "ozet": "16 çekirdek / 32 iş parçacığı · 5.7 GHz" },
+      "fiyat": 64900, "eski": 0, "stok": 9, "watt": 170, "puan": 98, "soket": "AM5",
+      "etiket": "NEW", "ton": 1, "ozet": "16 cores / 32 threads · 5.7 GHz" },
     { "ad": "Zephyr 9800X3D", "marka": "Zephyr", "kat": 2, "ikon": "◫",
-      "fiyat": 1949900, "eski": 2149900, "stok": 4, "watt": 120, "puan": 92, "soket": "AM5",
-      "etiket": "İNDİRİM", "ton": 1, "ozet": "8 çekirdek · 3B önbellek · oyun canavarı" },
+      "fiyat": 47900, "eski": 52900, "stok": 4, "watt": 120, "puan": 92, "soket": "AM5",
+      "etiket": "SALE", "ton": 1, "ozet": "8 cores · 3D cache · a gaming monster" },
     { "ad": "Meridian Ultra 9 285K", "marka": "Meridian", "kat": 2, "ikon": "◫",
-      "fiyat": 2279900, "eski": 0, "stok": 6, "watt": 250, "puan": 94, "soket": "LGA1851",
-      "etiket": "", "ton": 1, "ozet": "24 çekirdek · NPU 13 TOPS · 5.7 GHz" },
+      "fiyat": 58900, "eski": 0, "stok": 6, "watt": 250, "puan": 94, "soket": "LGA1851",
+      "etiket": "", "ton": 1, "ozet": "24 cores · 13 TOPS NPU · 5.7 GHz" },
     { "ad": "Meridian Ultra 5 245K", "marka": "Meridian", "kat": 2, "ikon": "◫",
-      "fiyat": 1099900, "eski": 0, "stok": 15, "watt": 159, "puan": 72, "soket": "LGA1851",
-      "etiket": "", "ton": 1, "ozet": "14 çekirdek · dengeli iş istasyonu" },
+      "fiyat": 28900, "eski": 0, "stok": 15, "watt": 159, "puan": 72, "soket": "LGA1851",
+      "etiket": "", "ton": 1, "ozet": "14 cores · balanced workstation" },
 
     { "ad": "Pulse 32 GB DDR5 6000", "marka": "Pulse", "kat": 3, "ikon": "▤",
-      "fiyat": 419900, "eski": 0, "stok": 34, "watt": 12, "puan": 70, "soket": "DDR5",
-      "etiket": "", "ton": 2, "ozet": "2×16 GB · CL30 · alüminyum soğutucu" },
+      "fiyat": 10900, "eski": 0, "stok": 34, "watt": 12, "puan": 70, "soket": "DDR5",
+      "etiket": "", "ton": 2, "ozet": "2×16 GB · CL30 · aluminium heatspreader" },
     { "ad": "Pulse 64 GB DDR5 6400", "marka": "Pulse", "kat": 3, "ikon": "▤",
-      "fiyat": 899900, "eski": 999900, "stok": 11, "watt": 16, "puan": 78, "soket": "DDR5",
-      "etiket": "İNDİRİM", "ton": 2, "ozet": "2×32 GB · CL32 · RGB'siz sade seri" },
+      "fiyat": 22900, "eski": 25900, "stok": 11, "watt": 16, "puan": 78, "soket": "DDR5",
+      "etiket": "SALE", "ton": 2, "ozet": "2×32 GB · CL32 · plain, no RGB" },
     { "ad": "Pulse 16 GB DDR5 5600", "marka": "Pulse", "kat": 3, "ikon": "▤",
-      "fiyat": 219900, "eski": 0, "stok": 0, "watt": 9, "puan": 52, "soket": "DDR5",
-      "etiket": "", "ton": 2, "ozet": "2×8 GB · giriş seviyesi · düşük gerilim" },
+      "fiyat": 5900, "eski": 0, "stok": 0, "watt": 9, "puan": 52, "soket": "DDR5",
+      "etiket": "", "ton": 2, "ozet": "2×8 GB · entry level · low voltage" },
 
     { "ad": "Nyx 2 TB Gen5 NVMe", "marka": "Nyx", "kat": 4, "ikon": "▦",
-      "fiyat": 749900, "eski": 0, "stok": 18, "watt": 11, "puan": 90, "soket": "M.2",
-      "etiket": "YENİ", "ton": 0, "ozet": "14.500 MB/s okuma · soğutuculu" },
+      "fiyat": 19900, "eski": 0, "stok": 18, "watt": 11, "puan": 90, "soket": "M.2",
+      "etiket": "NEW", "ton": 0, "ozet": "14,500 MB/s read · with heatsink" },
     { "ad": "Nyx 1 TB Gen4 NVMe", "marka": "Nyx", "kat": 4, "ikon": "▦",
-      "fiyat": 289900, "eski": 349900, "stok": 26, "watt": 8, "puan": 74, "soket": "M.2",
-      "etiket": "İNDİRİM", "ton": 0, "ozet": "7.400 MB/s okuma · DRAM önbellekli" },
+      "fiyat": 8900, "eski": 10900, "stok": 26, "watt": 8, "puan": 74, "soket": "M.2",
+      "etiket": "SALE", "ton": 0, "ozet": "7,400 MB/s read · DRAM cache" },
     { "ad": "Nyx 4 TB SATA SSD", "marka": "Nyx", "kat": 4, "ikon": "▦",
-      "fiyat": 529900, "eski": 0, "stok": 5, "watt": 6, "puan": 46, "soket": "SATA",
-      "etiket": "", "ton": 0, "ozet": "arşiv diski · 560 MB/s · 3D TLC" },
+      "fiyat": 13900, "eski": 0, "stok": 5, "watt": 6, "puan": 46, "soket": "SATA",
+      "etiket": "", "ton": 0, "ozet": "archive drive · 560 MB/s · 3D TLC" },
 
     { "ad": "Forge X870E Tempest", "marka": "Forge", "kat": 5, "ikon": "▥",
-      "fiyat": 1189900, "eski": 0, "stok": 8, "watt": 45, "puan": 88, "soket": "AM5",
-      "etiket": "", "ton": 3, "ozet": "PCIe 5.0 ×2 · Wi-Fi 7 · 18+2 faz" },
+      "fiyat": 32900, "eski": 0, "stok": 8, "watt": 45, "puan": 88, "soket": "AM5",
+      "etiket": "", "ton": 3, "ozet": "PCIe 5.0 ×2 · Wi-Fi 7 · 18+2 phase" },
     { "ad": "Forge B850 Kestrel", "marka": "Forge", "kat": 5, "ikon": "▥",
-      "fiyat": 549900, "eski": 0, "stok": 14, "watt": 38, "puan": 66, "soket": "AM5",
-      "etiket": "", "ton": 3, "ozet": "PCIe 5.0 M.2 · 2.5 GbE · sade VRM" },
+      "fiyat": 15900, "eski": 0, "stok": 14, "watt": 38, "puan": 66, "soket": "AM5",
+      "etiket": "", "ton": 3, "ozet": "PCIe 5.0 M.2 · 2.5 GbE · simple VRM" },
     { "ad": "Forge Z890 Cinder", "marka": "Forge", "kat": 5, "ikon": "▥",
-      "fiyat": 1049900, "eski": 1199900, "stok": 6, "watt": 42, "puan": 86, "soket": "LGA1851",
-      "etiket": "İNDİRİM", "ton": 3, "ozet": "Thunderbolt 4 · Wi-Fi 7 · 16+1 faz" },
+      "fiyat": 28900, "eski": 32900, "stok": 6, "watt": 42, "puan": 86, "soket": "LGA1851",
+      "etiket": "SALE", "ton": 3, "ozet": "Thunderbolt 4 · Wi-Fi 7 · 16+1 phase" },
 
     { "ad": "Aegis 1000W Gold", "marka": "Aegis", "kat": 6, "ikon": "▣",
-      "fiyat": 649900, "eski": 0, "stok": 10, "watt": 1000, "puan": 92, "soket": "ATX3.1",
-      "etiket": "", "ton": 2, "ozet": "ATX 3.1 · 12V-2×6 · tam modüler" },
+      "fiyat": 17900, "eski": 0, "stok": 10, "watt": 1000, "puan": 92, "soket": "ATX3.1",
+      "etiket": "", "ton": 2, "ozet": "ATX 3.1 · 12V-2×6 · fully modular" },
     { "ad": "Aegis 850W Gold", "marka": "Aegis", "kat": 6, "ikon": "▣",
-      "fiyat": 449900, "eski": 499900, "stok": 13, "watt": 850, "puan": 84, "soket": "ATX3.1",
-      "etiket": "İNDİRİM", "ton": 2, "ozet": "ATX 3.1 · sessiz fan kipi · 10 yıl garanti" },
+      "fiyat": 12900, "eski": 14900, "stok": 13, "watt": 850, "puan": 84, "soket": "ATX3.1",
+      "etiket": "SALE", "ton": 2, "ozet": "ATX 3.1 · quiet fan mode · 10-year warranty" },
     { "ad": "Aegis 750W Bronze", "marka": "Aegis", "kat": 6, "ikon": "▣",
-      "fiyat": 279900, "eski": 0, "stok": 2, "watt": 750, "puan": 62, "soket": "ATX",
-      "etiket": "SON 3", "ton": 2, "ozet": "yarı modüler · 120 mm akışkan yataklı fan" },
+      "fiyat": 7900, "eski": 0, "stok": 2, "watt": 750, "puan": 62, "soket": "ATX",
+      "etiket": "LAST 3", "ton": 2, "ozet": "semi-modular · 120 mm fluid-bearing fan" },
 ]
 
-SIRALAMALAR = ["Öne çıkanlar", "Fiyat: artan", "Fiyat: azalan", "Performans"]
+SIRALAMALAR = ["Featured", "Price: low to high", "Price: high to low", "Performance"]
 
-KARGO_ESIGI = 500000       # 5.000,00 TL üzeri kargo bedava
-KARGO_UCRETI = 14900
+KARGO_ESIGI = 50000        # free shipping over $500.00
+KARGO_UCRETI = 1490
 
 
 # ============================================================
@@ -246,10 +231,10 @@ fn heroKur():
 
     kutu("heroSol", "heroRozet", "hero-rozet")
     kutu("heroRozet", "heroNokta", "nokta")
-    yaz("heroRozet", "heroRozetMetin", "span", "", "2026 kataloğu · aynı gün kargo")
+    yaz("heroRozet", "heroRozetMetin", "span", "", "2026 catalogue · same-day shipping")
 
     web.dugum("heroSol", "heroBaslik", "h1", "hero-baslik")
-    satirlar = ["Parçaları seç,", "sistemi kur,"]
+    satirlar = ["Pick the parts,", "build the system,"]
     i = 0
     while i < len(satirlar):
         d = kutu("heroBaslik", f"satir{i}", "satir")
@@ -257,21 +242,21 @@ fn heroKur():
         web.oynat(f"satirIc{i}", "satirAc", 900, "cubic-bezier(.16,1,.3,1)", 120 + i * 110, 1)
         i = i + 1
     d = kutu("heroBaslik", "satir2", "satir")
-    yaz(d, "satirIc2", "span", "vurgu", "gücü ölç.")
+    yaz(d, "satirIc2", "span", "vurgu", "measure the power.")
     web.oynat("satirIc2", "satirAc", 900, "cubic-bezier(.16,1,.3,1)", 340, 1)
 
     yaz("heroSol", "heroAlt", "p", "hero-alt",
-        "Ekran kartından güç kaynağına kadar her bileşen; uyumluluk, güç bütçesi ve darboğaz hesabı sepete eklemeden önce.")
+        "Every component from the graphics card to the power supply, with compatibility, power budget and bottleneck worked out before you add to cart.")
     web.oynat("heroAlt", "yukselt", 760, "cubic-bezier(.16,1,.3,1)", 470, 1)
 
     kutu("heroSol", "heroDugmeler", "hero-dugmeler")
-    dugme("heroDugmeler", "heroDugme1", "dugme dugme-ana", "Kataloğu gez", "katalogaGit", 0)
-    dugme("heroDugmeler", "heroDugme2", "dugme dugme-sade", "Sistem kur", "kurucuyaGit", 0)
+    dugme("heroDugmeler", "heroDugme1", "dugme dugme-ana", "Browse catalogue", "katalogaGit", 0)
+    dugme("heroDugmeler", "heroDugme2", "dugme dugme-sade", "Build a system", "kurucuyaGit", 0)
     web.oynat("heroDugmeler", "yukselt", 760, "cubic-bezier(.16,1,.3,1)", 560, 1)
 
     # İstatistikler — sayılar sıfırdan hedefe sayıyor.
     kutu("heroSol", "heroIst", "hero-istatistik")
-    istAd = ["ürün çeşidi", "marka", "yıl garanti"]
+    istAd = ["products", "brands", "yr warranty"]
     istDeger = [len(URUNLER), 6, 3]
     i = 0
     while i < len(istAd):
@@ -375,10 +360,10 @@ fn urunlerKur():
     kutu("", "urunler", "bolum")
     kutu("urunler", "urunBas", "bolum-bas")
     b = kutu("urunBas", "urunBasSol", "")
-    yaz(b, "urunEtiket", "div", "bolum-etiket", "Katalog")
-    yaz(b, "urunBaslik", "h2", "bolum-baslik", "Bileşenler")
+    yaz(b, "urunEtiket", "div", "bolum-etiket", "Catalogue")
+    yaz(b, "urunBaslik", "h2", "bolum-baslik", "Components")
     yaz(b, "urunAlt", "p", "bolum-alt",
-        "Filtre, sıralama ve stok durumu betikte hesaplanıyor; sayfa yalnızca sonucu çiziyor.")
+        "Filtering, sorting and stock are worked out in the script; the page only draws the result.")
 
     kutu("urunler", "filtre", "filtre")
     i = 0
@@ -390,7 +375,7 @@ fn urunlerKur():
         i = i + 1
 
     s = kutu("filtre", "siralaKutu", "sirala")
-    yaz(s, "siralaEtiket", "span", "", "Sırala")
+    yaz(s, "siralaEtiket", "span", "", "Sort")
     web.dugum(s, "siralaSecim", "select", "")
     i = 0
     while i < len(SIRALAMALAR):
@@ -423,16 +408,16 @@ fn kartCiz(u: int, sira: int):
 
     if urun["etiket"] != "":
         sinif = "kart-etiket"
-        if urun["etiket"] == "İNDİRİM":
+        if urun["etiket"] == "SALE":
             sinif = "kart-etiket etiket-indirim"
-        elif urun["etiket"] == "SON 3":
+        elif urun["etiket"] == "LAST 3":
             sinif = "kart-etiket etiket-son"
         yaz(id, f"ke{n}", "div", sinif, urun["etiket"])
 
     yaz(id, f"km{n}", "div", "kart-marka", urun["marka"])
-    # CSS text-transform:uppercase, sayfa lang="tr" olduğu için 'i' harfini 'İ'
-    # yapıyor: "Raiden" -> "RAİDEN", "Meridian" -> "MERİDİAN". Marka adları Latin
-    # yazımlı; o düğüme lang="en" verilerek Türkçe büyütme kuralı devre dışı.
+    # Defensive: CSS text-transform:uppercase follows the element language, and
+    # under lang="tr" it turns "Raiden" into "RAİDEN" (dotted capital I). Brand
+    # names are Latin-cased, so the node is pinned to lang="en".
     web.oznitelik(f"km{n}", "lang", "en")
     yaz(id, f"ka{n}", "div", "kart-ad", urun["ad"])
     yaz(id, f"ko{n}", "div", "kart-ozet", urun["ozet"])
@@ -441,15 +426,15 @@ fn kartCiz(u: int, sira: int):
     sol = kutu(alt, f"kfk{n}", "")
     fiyatKutusu = kutu(sol, f"kf{n}", "kart-fiyat")
     if urun["eski"] > 0:
-        yaz(fiyatKutusu, f"kes{n}", "span", "kart-eski", paraYaz(urun["eski"]))
-    yaz(fiyatKutusu, f"kfd{n}", "span", "", paraYaz(urun["fiyat"]))
-    yaz(fiyatKutusu, f"kb{n}", "span", "kart-birim", "TL")
+        yaz(fiyatKutusu, f"kes{n}", "span", "kart-eski", f"${paraYaz(urun['eski'])}")
+    yaz(fiyatKutusu, f"kfd{n}", "span", "", f"${paraYaz(urun['fiyat'])}")
+    yaz(fiyatKutusu, f"kp{n}", "span", "kart-birim", "")
     yaz(sol, f"ks{n}", "div", stokSinifi(urun["stok"]), stokMetni(urun["stok"]))
 
     if urun["stok"] > 0:
-        dugme(alt, f"kd{n}", "ekle", "Sepete ekle", "sepeteEkle", u)
+        dugme(alt, f"kd{n}", "ekle", "Add to cart", "sepeteEkle", u)
     else:
-        d = dugme(alt, f"kd{n}", "ekle", "Tükendi", "hicbirSey", 0)
+        d = dugme(alt, f"kd{n}", "ekle", "Sold out", "hicbirSey", 0)
         web.oznitelik(d, "disabled", "1")
 
     # Kademeli giriş: her kart bir öncekinden 55 ms sonra. 20 kart için tek
@@ -465,10 +450,10 @@ fn stokSinifi(stok: int) -> str:
 
 fn stokMetni(stok: int) -> str:
     if stok == 0:
-        return "Stokta yok"
+        return "Out of stock"
     if stok <= 5:
-        return f"Son {stok} adet"
-    return f"Stokta {stok} adet"
+        return f"Only {stok} left"
+    return f"{stok} in stock"
 
 
 # ============================================================
@@ -493,7 +478,7 @@ fn secimKur(ust: str, id: str, etiket: str, k: int):
     while i < len(liste):
         o = f"{id}o{i}"
         u = URUNLER[liste[i]]
-        yaz(id, o, "option", "", f"{u['ad']} — {paraYaz(u['fiyat'])} TL")
+        yaz(id, o, "option", "", f"{u['ad']} — ${paraYaz(u['fiyat'])}")
         web.oznitelik(o, "value", f"{liste[i]}")
         i = i + 1
     web.dinle(id, "degis", "kurulumGuncelle", 0)
@@ -502,22 +487,22 @@ fn kurucuKur():
     kutu("", "kurucu", "bolum")
     kutu("kurucu", "kurucuBas", "bolum-bas")
     b = kutu("kurucuBas", "kurucuBasSol", "")
-    yaz(b, "kurucuEtiket", "div", "bolum-etiket", "Sistem kurucu")
-    yaz(b, "kurucuBaslik", "h2", "bolum-baslik", "Uyumlu mu, yetiyor mu?")
+    yaz(b, "kurucuEtiket", "div", "bolum-etiket", "Build checker")
+    yaz(b, "kurucuBaslik", "h2", "bolum-baslik", "Does it fit, is it enough?")
     yaz(b, "kurucuAlt", "p", "bolum-alt",
-        "Soket eşleşmesi, güç bütçesi ve darboğaz tahmini seçim değiştikçe yeniden hesaplanıyor.")
+        "Socket match, power budget and bottleneck estimate are recomputed on every change.")
 
     kutu("kurucu", "kurucuIzgara", "kurucu")
     sol = kutu("kurucuIzgara", "kurucuSol", "panel")
-    secimKur(sol, "secIslemci", "İşlemci", 2)
-    secimKur(sol, "secAnakart", "Anakart", 5)
-    secimKur(sol, "secEkran", "Ekran kartı", 1)
-    secimKur(sol, "secGuc", "Güç kaynağı", 6)
+    secimKur(sol, "secIslemci", "Processor", 2)
+    secimKur(sol, "secAnakart", "Mainboard", 5)
+    secimKur(sol, "secEkran", "Graphics card", 1)
+    secimKur(sol, "secGuc", "Power supply", 6)
 
     sag = kutu("kurucuIzgara", "kurucuSag", "panel")
     o = kutu(sag, "olcer", "olcer")
     ob = kutu(o, "olcerBas", "olcer-bas")
-    yaz(ob, "olcerAd", "span", "", "Güç bütçesi")
+    yaz(ob, "olcerAd", "span", "", "Power budget")
     yaz(ob, "olcerDeger", "span", "", "—")
     y = kutu(o, "olcerYol", "olcer-yol")
     kutu(y, "olcerDolu", "olcer-dolu")
@@ -547,36 +532,36 @@ fn kurulumGuncelle(_):
     sayac = 0
 
     if islemci["soket"] != anakart["soket"]:
-        sayac = uyariEkle(sayac, "hata", f"Soket uyuşmuyor: işlemci {islemci['soket']}, anakart {anakart['soket']}. Bu ikisi aynı kasaya girmez.")
+        sayac = uyariEkle(sayac, "hata", f"Socket mismatch: the CPU is {islemci['soket']}, the board is {anakart['soket']}. These two do not go in the same case.")
     else:
-        sayac = uyariEkle(sayac, "ok", f"Soket eşleşti ({islemci['soket']}).")
+        sayac = uyariEkle(sayac, "ok", f"Socket matches ({islemci['soket']}).")
 
     if doluluk > 100:
-        sayac = uyariEkle(sayac, "hata", f"Güç kaynağı yetmiyor: {cekilen} W çekilirken {kapasite} W veriliyor.")
+        sayac = uyariEkle(sayac, "hata", f"Power supply is short: {cekilen} W drawn, {kapasite} W available.")
     elif doluluk > 80:
-        sayac = uyariEkle(sayac, "dikkat", f"Pay dar: kapasitenin %{doluluk}{yuzdeEki(doluluk)} kullanılıyor. Tepe akımlarda kapanma riski var, bir üst modele bakın.")
+        sayac = uyariEkle(sayac, "dikkat", f"Headroom is tight: {doluluk}% of capacity in use. Transient spikes could trip it, consider the next model up.")
     else:
-        sayac = uyariEkle(sayac, "ok", f"Güç payı rahat: kapasitenin %{doluluk}{yuzdeEki(doluluk)} kullanılıyor.")
+        sayac = uyariEkle(sayac, "ok", f"Comfortable headroom: {doluluk}% of capacity in use.")
 
     # Darboğaz: iki bileşenin performans puanı arasındaki fark. Kaba ama dürüst
     # bir tahmin — kesin sayı verilmiyor, hangisinin geride kaldığı söyleniyor.
     fark = ekran["puan"] - islemci["puan"]
     if fark > 14:
-        sayac = uyariEkle(sayac, "dikkat", f"İşlemci darboğaz olabilir: ekran kartı {fark} puan önde. Yüksek çözünürlükte sorun değil, 1080p'de fark eder.")
+        sayac = uyariEkle(sayac, "dikkat", f"The CPU may bottleneck: the GPU is {fark} points ahead. Fine at high resolution, noticeable at 1080p.")
     elif fark < -14:
-        sayac = uyariEkle(sayac, "dikkat", f"Ekran kartı geride: işlemci {-fark} puan önde. Oyun için daha güçlü bir karta bakılabilir.")
+        sayac = uyariEkle(sayac, "dikkat", f"The GPU is behind: the CPU is {-fark} points ahead. For gaming, look at a stronger card.")
     else:
-        sayac = uyariEkle(sayac, "ok", "İşlemci ile ekran kartı dengeli.")
+        sayac = uyariEkle(sayac, "ok", "CPU and GPU are balanced.")
 
     toplam = islemci["fiyat"] + anakart["fiyat"] + ekran["fiyat"] + guc["fiyat"]
     web.temizle("ozet")
-    ozetSatir("ozIslemci", "İşlemci", islemci["fiyat"])
-    ozetSatir("ozAnakart", "Anakart", anakart["fiyat"])
-    ozetSatir("ozEkran", "Ekran kartı", ekran["fiyat"])
-    ozetSatir("ozGuc", "Güç kaynağı", guc["fiyat"])
+    ozetSatir("ozIslemci", "Processor", islemci["fiyat"])
+    ozetSatir("ozAnakart", "Mainboard", anakart["fiyat"])
+    ozetSatir("ozEkran", "Graphics card", ekran["fiyat"])
+    ozetSatir("ozGuc", "Power supply", guc["fiyat"])
     t = kutu("ozet", "ozToplam", "ozet-satir ozet-toplam")
-    yaz(t, "ozToplamAd", "span", "", "Sistem toplamı")
-    yaz(t, "ozToplamDeger", "span", "", f"{paraYaz(toplam)} TL")
+    yaz(t, "ozToplamAd", "span", "", "Build total")
+    yaz(t, "ozToplamDeger", "span", "", f"${paraYaz(toplam)}")
     web.oynat("ozToplamDeger", "yukselt", 420, "ease-out", 0, 1)
     return 0
 
@@ -589,7 +574,7 @@ fn uyariEkle(sayac: int, tur: str, metin: str) -> int:
 fn ozetSatir(id: str, ad: str, kurus: int):
     s = kutu("ozet", id, "ozet-satir")
     yaz(s, f"{id}Ad", "span", "ozet-ad", ad)
-    yaz(s, f"{id}Deger", "span", "", f"{paraYaz(kurus)} TL")
+    yaz(s, f"{id}Deger", "span", "", f"${paraYaz(kurus)}")
 
 
 # ============================================================
@@ -654,13 +639,13 @@ fn sepetiCiz():
     web.temizle("cekmeceIc")
 
     bas = kutu("cekmeceIc", "cekBas", "cekmece-bas")
-    yaz(bas, "cekBaslik", "h3", "", "Sepet")
+    yaz(bas, "cekBaslik", "h3", "", "Cart")
     dugme(bas, "cekKapat", "kapat", "✕", "cekmeceKapat", 0)
 
     if len(sepet) == 0:
         b = kutu("cekmeceIc", "cekBos", "bos")
         yaz(b, "cekBosIkon", "span", "bos-ikon", "▢")
-        yaz(b, "cekBosMetin", "div", "", "Sepetin boş. Kataloğa göz at.")
+        yaz(b, "cekBosMetin", "div", "", "Your cart is empty. Have a look at the catalogue.")
         return 0
 
     i = 0
@@ -672,10 +657,10 @@ fn sepetiCiz():
         yaz(id, f"satIkon{i}", "div", "satir-ikon", urun["ikon"])
         orta = kutu(id, f"satOrta{i}", "")
         yaz(orta, f"satAd{i}", "div", "satir-ad", urun["ad"])
-        yaz(orta, f"satAlt{i}", "div", "satir-alt", f"{s['adet']} × {paraYaz(urun['fiyat'])} TL")
+        yaz(orta, f"satAlt{i}", "div", "satir-alt", f"{s['adet']} × ${paraYaz(urun['fiyat'])}")
         sag = kutu(id, f"satSag{i}", "satir-sag")
-        yaz(sag, f"satFiyat{i}", "div", "satir-fiyat", f"{paraYaz(urun['fiyat'] * s['adet'])} TL")
-        dugme(sag, f"satCikar{i}", "cikar", "kaldır", "sepettenCikar", s["u"])
+        yaz(sag, f"satFiyat{i}", "div", "satir-fiyat", f"${paraYaz(urun['fiyat'] * s['adet'])}")
+        dugme(sag, f"satCikar{i}", "cikar", "remove", "sepettenCikar", s["u"])
         web.oynat(id, "saganGir", 420, "cubic-bezier(.16,1,.3,1)", i * 45, 1)
         i = i + 1
 
@@ -690,14 +675,14 @@ fn sepetiCiz():
     web.stil("cekDolu", "width", f"{oran if oran <= 100 else 100}%")
 
     kutu("cekmeceIc", "cekOzet", "")
-    ozetSatirCek("cekAra", "Ara toplam", f"{paraYaz(ara)} TL")
-    ozetSatirCek("cekKdv", "KDV dahil (%20)", f"{paraYaz(ara * 20 // 120)} TL")
-    ozetSatirCek("cekKrg", "Kargo", "Ücretsiz" if kargo == 0 else f"{paraYaz(kargo)} TL")
+    ozetSatirCek("cekAra", "Subtotal", f"${paraYaz(ara)}")
+    ozetSatirCek("cekKdv", "VAT included (20%)", f"${paraYaz(ara * 20 // 120)}")
+    ozetSatirCek("cekKrg", "Shipping", "Free" if kargo == 0 else f"${paraYaz(kargo)}")
     t = kutu("cekOzet", "cekTop", "ozet-satir ozet-toplam")
-    yaz(t, "cekTopAd", "span", "", "Toplam")
-    yaz(t, "cekTopDeger", "span", "", f"{paraYaz(ara + kargo)} TL")
+    yaz(t, "cekTopAd", "span", "", "Total")
+    yaz(t, "cekTopDeger", "span", "", f"${paraYaz(ara + kargo)}")
 
-    dugme("cekmeceIc", "cekOde", "dugme dugme-ana", "Ödemeye geç", "odemeyeGec", 0)
+    dugme("cekmeceIc", "cekOde", "dugme dugme-ana", "Checkout", "odemeyeGec", 0)
     web.stil("cekOde", "width", "100%")
     web.stil("cekOde", "margin-top", "18px")
     return 0
@@ -709,8 +694,8 @@ fn ozetSatirCek(id: str, ad: str, deger: str):
 
 fn kargoMetni(ara: int) -> str:
     if ara >= KARGO_ESIGI:
-        return "Kargo bedava — eşiği geçtin."
-    return f"Ücretsiz kargoya {paraYaz(KARGO_ESIGI - ara)} TL kaldı."
+        return "Free shipping unlocked."
+    return f"${paraYaz(KARGO_ESIGI - ara)} away from free shipping."
 
 
 # ============================================================
@@ -745,7 +730,7 @@ fn cekmeceKapat(_):
 
 fn odemeyeGec(_):
     # Demo: ödeme yok. Gerçek mağazada burada sipariş oluşurdu.
-    web.metin("cekOde", f"{sepetAdedi()} ürün · demo, ödeme yok")
+    web.metin("cekOde", f"{sepetAdedi()} items · demo, no payment")
     return 0
 
 fn bolumGorundu(hangi: int):
@@ -770,11 +755,11 @@ fn hicbirSey(_):
 fn baslat():
     cizelgeleriKur()
 
-    web.metin("markaAd", "RAIDEN PARÇA")
-    web.metin("sepetEtiket", "Sepet")
+    web.metin("markaAd", "RAIDEN PARTS")
+    web.metin("sepetEtiket", "Cart")
 
     i = 0
-    menuAdlari = ["Katalog", "Sistem kurucu", "Destek"]
+    menuAdlari = ["Catalogue", "Build checker", "Support"]
     while i < len(menuAdlari):
         yaz("menu", f"menu{i}", "a", "", menuAdlari[i])
         web.oznitelik(f"menu{i}", "href", "#")
@@ -796,7 +781,7 @@ fn baslat():
 fn altKur():
     kutu("", "alt", "alt")
     yaz("alt", "altNot", "div", "alt-not",
-        "Bu sayfanın katalogu, fiyatları, filtresi, sepeti, uyumluluk kuralları ve animasyon zamanlaması RaidenScript ile yazıldı. JavaScript yalnızca düğüm açıyor ve zaman çizelgesini tarayıcıya devrediyor.")
+        "The catalogue, prices, filtering, cart, compatibility rules and animation timings on this page are written in RaidenScript. JavaScript only opens nodes and hands timelines to the browser.")
     yaz("alt", "altHak", "div", "", "© 2026 Raiden Technology · demo")
     web.oynat("altNot", "yukselt", 700, "ease-out", 0, 1)
     return 0
