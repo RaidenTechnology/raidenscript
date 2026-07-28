@@ -593,6 +593,21 @@ Full name **RaidenScript**, short **RS**, command `rai`, extension `.rai` — fr
 `.rs` belongs to Rust, `.rds` to R, `.rsc` to MikroTik RouterOS, `.ra` to
 RealAudio. `.rai` was free.
 
+## Authorship and AI
+
+Written openly, so read this before judging the code either way.
+
+**Mine:** the language itself — its design, and the `src/` implementation: lexer,
+parser, resolver, interpreter, REPL and the C embedding API, including the string
+channel. Every design decision in [SPEC.md](SPEC.md), including the ones that
+were wrong and got reversed, is mine and the reasoning is written down there.
+
+**AI-written from my designs:** the host bindings (`bindings/js`, `bindings/jvm`)
+and the demo applications (`demo/`). And, since 28 July 2026, one round of
+bug fixes inside `src/` — I asked an AI to audit the interpreter and fix what it
+found; the seven fixes in the "hata avı" entry of [WORKLOG.md](WORKLOG.md) are
+its C++, reviewed and tested by me. Before that date `src/` was untouched by AI.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). The *RaidenScript* name and the Raiden Technology
