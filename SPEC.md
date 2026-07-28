@@ -485,11 +485,20 @@ Pratt parser bu tabloyu birebir uygular. Düşükten yükseğe:
 | 3 | `not` (tekli) | sağ |
 | 4 | `==` `!=` `<` `>` `<=` `>=` `is` `in` | sol |
 | 5 | `..` `..=` | sol |
-| 6 | `+` `-` | sol |
-| 7 | `*` `/` `//` `%` | sol |
-| 8 | `-` `+` `~` (tekli) | sağ |
-| 9 | `**` | **sağ** |
-| 10 | `()` `[]` `.` `?.` (sonek) | sol |
+| 6 | `\|` (bit veya) | sol |
+| 7 | `^` (bit özel veya) | sol |
+| 8 | `&` (bit ve) | sol |
+| 9 | `<<` `>>` (kaydırma) | sol |
+| 10 | `+` `-` | sol |
+| 11 | `*` `/` `//` `%` | sol |
+| 12 | `-` `+` `~` (tekli) | sağ |
+| 13 | `**` | **sağ** |
+| 14 | `()` `[]` `.` `?.` (sonek) | sol |
+
+> Bit operatörleri yalnızca `int` üzerinde çalışır ve kaydırma miktarı 0-63
+> aralığında olmalıdır — dışına çıkmak C'deki gibi sessiz/tanımsız değil,
+> yakalanabilir bir hatadır. Sıra Python/C ile aynı: karşılaştırma `&`'den
+> daha gevşek bağlar, yani `bayraklar & MASKE == 0` ifadesinde önce `&` işlenir.
 
 ---
 
@@ -593,7 +602,11 @@ or_expr        = and_expr { "or" and_expr } ;
 and_expr       = not_expr { "and" not_expr } ;
 not_expr       = "not" not_expr | compare ;
 compare        = range_expr { ( "==" | "!=" | "<" | ">" | "<=" | ">=" | "is" | "in" ) range_expr } ;
-range_expr     = sum [ ( ".." | "..=" ) sum ] ;
+range_expr     = bit_or [ ( ".." | "..=" ) bit_or ] ;
+bit_or         = bit_xor { "|" bit_xor } ;
+bit_xor        = bit_and { "^" bit_and } ;
+bit_and        = shift { "&" shift } ;
+shift          = sum { ( "<<" | ">>" ) sum } ;
 sum            = product { ( "+" | "-" ) product } ;
 product        = unary { ( "*" | "/" | "//" | "%" ) unary } ;
 unary          = ( "-" | "+" | "~" | "await" ) unary | power ;

@@ -38,6 +38,10 @@ struct rs_vm {
     std::string sonHata;
     bool yuklendi = false;
 
+    // 0 = yorumlayıcının varsayılanı. Host eval'den önce de sonra da
+    // ayarlayabilsin diye burada bekletiliyor (interp eval'de doğuyor).
+    int maxDerinlik = 0;
+
     // Dize kanalı — yalnızca host geri çağrısı sürerken anlamlı.
     // aktifArg, yorumlayıcının yığınındaki argüman vektörünü gösterir;
     // sahibi biz değiliz, çağrı bitince mutlaka nullptr olmalı.
@@ -103,6 +107,16 @@ void rs_set_host(rs_vm* vm, rs_host_fn cb, void* user) {
     vm->user = user;
 }
 
+void rs_set_max_depth(rs_vm* vm, int n) {
+    if (vm == nullptr || n <= 0) {
+        return;
+    }
+    vm->maxDerinlik = n;
+    if (vm->interp != nullptr) {
+        vm->interp->setMaxDepth(n);
+    }
+}
+
 int rs_register(rs_vm* vm, const char* modul, const char* fn) {
     if (vm == nullptr || modul == nullptr || fn == nullptr) {
         return 1;
@@ -149,6 +163,9 @@ int rs_eval(rs_vm* vm, const char* kaynak, const char* ad) {
     }
 
     vm->interp = std::make_unique<rs::Interpreter>(*vm->src, *vm->diag);
+    if (vm->maxDerinlik > 0) {
+        vm->interp->setMaxDepth(vm->maxDerinlik);
+    }
 
     // Köprü, run'dan ÖNCE kurulmalı: 'include game' üst düzey bir deyim ve
     // run sırasında çözülüyor.

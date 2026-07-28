@@ -77,6 +77,19 @@ public:
     // istisna fırlatırsa false döner; sebep diag_'a yazılır.
     bool callGlobal(const std::string& ad, std::vector<Value>& args, Value& out);
 
+    // --- özyineleme koruması ---
+    //
+    // Ağaç yürüyen yorumlayıcıda bir betik karesi birkaç C++ karesi demek, ve
+    // taşma yakalanabilir bir hata DEĞİL: host sürecinin sessiz ölümü. Ölçüldü
+    // (faz5-web-tasarim.md H6): native 8 MB'ta ~1.000 kare, wasm 8 MB'ta ~1.000,
+    // JVM'in varsayılan 1 MB'ında ~500 — orada Java istisnası bile doğmuyor,
+    // Minecraft sunucusu tek satır iz bırakmadan kapanıyor.
+    //
+    // Varsayılan 800: native ve wasm'ın ölçülen sınırının altında. JVM gibi dar
+    // yığınlı host'lar setMaxDepth ile (C API: rs_set_max_depth) daha da indirir.
+    void setMaxDepth(int n) { maxDerinlik_ = n > 0 ? n : 1; }
+    [[nodiscard]] int maxDepth() const noexcept { return maxDerinlik_; }
+
 private:
     // 'include' için host haritası kurar; modül kayıtlı değilse nullopt.
     std::optional<Value> hostModul(const std::string& modul);
@@ -93,6 +106,8 @@ private:
     Value cagirFn(const std::shared_ptr<FnObj>& fn, std::vector<Value>& args, Span span,
                   const Value* self);
     Value ikili(Tok op, const Value& a, const Value& b, Span span);
+    // Yerleşik metotların dize argümanı — tipi denetlenmeden okunursa çökme.
+    const std::string& dizeArg(std::vector<Value>& a, std::size_t i, const char* metot, Span span);
     Value uyeOku(const Value& obj, const std::string& ad, Span span, bool guvenli);
     Value indeksOku(const Value& obj, const Value& idx, Span span);
     void indeksYaz(const Value& obj, const Value& idx, Value v, Span span);
@@ -158,6 +173,9 @@ private:
     std::shared_ptr<ClassObj> superOwner_;  // 'super' çözümü için
 
     std::shared_ptr<ClassObj> errorClass_;
+
+    int derinlik_ = 0;        // o an açık olan betik çağrısı sayısı
+    int maxDerinlik_ = 800;   // bkz. setMaxDepth
 
     // Prelude, RaidenScript kaynağı olarak yazılıyor; AST'si programın ömrü
     // boyunca yaşamalı, o yüzden burada tutuluyor.

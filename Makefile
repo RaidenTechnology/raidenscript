@@ -78,7 +78,7 @@ EMCXX     ?= em++
 WASM_DIR  := dist
 WASM_OUT  := $(WASM_DIR)/raidenscript.js
 WASM_SRC  := $(filter-out $(SRC_DIR)/main.cpp,$(SOURCES))
-WASM_EXPORTS := '["_rs_new","_rs_free","_rs_set_host","_rs_register","_rs_eval","_rs_call","_rs_last_error","_rs_arg_str","_rs_return_str","_malloc","_free"]'
+WASM_EXPORTS := '["_rs_new","_rs_free","_rs_set_host","_rs_set_max_depth","_rs_register","_rs_eval","_rs_call","_rs_last_error","_rs_arg_str","_rs_return_str","_malloc","_free"]'
 WASM_RUNTIME := '["ccall","cwrap","addFunction","removeFunction","UTF8ToString","stringToUTF8","lengthBytesUTF8","getValue","setValue","HEAPF64"]'
 
 .PHONY: wasm

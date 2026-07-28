@@ -41,6 +41,19 @@ void   rs_free(rs_vm* vm);
 void rs_set_host(rs_vm* vm, rs_host_fn cb, void* user);
 int  rs_register(rs_vm* vm, const char* modul, const char* fn);
 
+/* Özyineleme sınırı: betik en fazla kaç iç içe çağrı yapabilir.
+ *
+ * Ağaç yürüyen yorumlayıcıda bir betik karesi birkaç C++ karesi demek ve YEREL
+ * yığın taşması yakalanabilir bir hata değil, sürecin sessiz ölümüdür. Ölçüm:
+ * native/wasm 8 MB yığında ~1.000 kare, JVM'in varsayılan 1 MB'ında ~500 —
+ * orada Java istisnası bile doğmuyor, sunucu iz bırakmadan kapanıyor.
+ *
+ * Varsayılan 800. Dar yığınlı host'lar (JNI iş parçacıkları) bunu indirmeli;
+ * yığını büyütenler (-Xss16m) yükseltebilir. Sınıra çarpınca betik normal bir
+ * Error alır: 'except' ile yakalanabilir, rs_last_error ile okunabilir.
+ * eval'den önce de sonra da çağrılabilir. */
+void rs_set_max_depth(rs_vm* vm, int n);
+
 /* Betiği yükler ve üst düzey deyimlerini çalıştırır (fonksiyon tanımları kurulur).
  * 0 = tamam, !0 = hata -> rs_last_error(). Bir VM'de yalnızca bir kez. */
 int rs_eval(rs_vm* vm, const char* kaynak, const char* ad);

@@ -69,11 +69,15 @@ private:
     ExprPtr notExpr();         // 3  not
     ExprPtr comparison();      // 4  == != < > <= >= is in
     ExprPtr rangeExpr();       // 5  .. ..=
-    ExprPtr sum();             // 6  + -
-    ExprPtr product();         // 7  * / // %
-    ExprPtr unary();           // 8  - + ~ await
-    ExprPtr power();           // 9  **  (sağ birleşmeli)
-    ExprPtr postfix();         // 10 () [] . ?.
+    ExprPtr bitOr();           // 6  |
+    ExprPtr bitXor();          // 7  ^
+    ExprPtr bitAnd();          // 8  &
+    ExprPtr shift();           // 9  << >>
+    ExprPtr sum();             // 10 + -
+    ExprPtr product();         // 11 * / // %
+    ExprPtr unary();           // 12 - + ~ await
+    ExprPtr power();           // 13 **  (sağ birleşmeli)
+    ExprPtr postfix();         // 14 () [] . ?.
     ExprPtr primary();
 
     ExprPtr lambdaOrGrouped();       // '(' sonrası: lambda mı parantezli ifade mi

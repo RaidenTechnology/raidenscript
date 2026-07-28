@@ -137,6 +137,11 @@ Java_com_raiden_rs_RaidenScript_nOpen(JNIEnv* /*env*/, jclass /*cls*/) {
     rs_vm* vm = rs_new();
     if (!vm) return 0;
     rs_set_host(vm, host_kopru, vm);
+    /* JVM'in varsayılan iş parçacığı yığını 1 MB ve betik karesi başına ~1,7 KB
+     * yerel yığın gidiyor: ~500 karede taşıyor ve taşma Java istisnası DEĞİL,
+     * sunucunun sessiz ölümü (hs_err bile yok). 400, o duvarın güvenli tarafı.
+     * -Xss ile büyük yığın veren sunucular bunu yükseltebilir. */
+    rs_set_max_depth(vm, 400);
     return (jlong)(intptr_t)vm;
 }
 

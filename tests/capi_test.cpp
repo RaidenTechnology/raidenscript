@@ -265,6 +265,105 @@ void t12() {
     rs_free(vm);
 }
 
+// 13 — sonsuz özyineleme: yığın taşması yerine yakalanabilir hata
+//
+// Bu testin asıl işi ÇÖKMEMEK. Sınır yoksa süreç burada sessizce ölüyordu
+// (JVM'de tüm Minecraft sunucusu, tek satır günlük bırakmadan).
+void t13() {
+    rs_vm* vm = rs_new();
+    rs_set_max_depth(vm, 100);
+    const int e = rs_eval(vm,
+                          "fn dip(n):\n"
+                          "    return dip(n + 1)\n",
+                          "t13.rai");
+    const double arg = 0.0;
+    double out = 0.0;
+    const int c = rs_call(vm, "dip", &arg, 1, &out);
+    const std::string hata = rs_last_error(vm);
+    bildir(e == 0 && c != 0 && hata.find("derin") != std::string::npos,
+           "sonsuz ozyineleme cokme degil hata veriyor", hata);
+    rs_free(vm);
+}
+
+// 14 — sınır aşımı betikte yakalanabilir ve VM sonrasında kullanılabilir kalıyor
+void t14() {
+    rs_vm* vm = rs_new();
+    rs_set_max_depth(vm, 50);
+    const int e = rs_eval(vm,
+                          "fn dip(n):\n"
+                          "    return dip(n + 1)\n"
+                          "fn dene():\n"
+                          "    try:\n"
+                          "        dip(0)\n"
+                          "    catch h:\n"
+                          "        return 7\n"
+                          "    return 0\n",
+                          "t14.rai");
+    double out = 0.0;
+    const int c = rs_call(vm, "dene", nullptr, 0, &out);
+    bildir(e == 0 && c == 0 && yakin(out, 7.0), "derinlik hatasi betikte yakalanabiliyor",
+           rs_last_error(vm));
+
+    // Sayaç geri alındı mı? Aynı VM'de sığ bir çağrı hâlâ çalışmalı.
+    double out2 = 0.0;
+    const int c2 = rs_call(vm, "dene", nullptr, 0, &out2);
+    bildir(c2 == 0 && yakin(out2, 7.0), "derinlik sayaci cagri sonrasi sifirlaniyor",
+           rs_last_error(vm));
+    rs_free(vm);
+}
+
+// 15 — yerleşik metoda yanlış tipte argüman: çökme değil hata
+void t15() {
+    rs_vm* vm = rs_new();
+    const int e = rs_eval(vm,
+                          "fn dene():\n"
+                          "    return \"a,b\".split(5)\n",
+                          "t15.rai");
+    double out = 0.0;
+    const int c = rs_call(vm, "dene", nullptr, 0, &out);
+    const std::string hata = rs_last_error(vm);
+    bildir(e == 0 && c != 0 && hata.find("split") != std::string::npos,
+           "split(sayi) cokmuyor, tip hatasi veriyor", hata);
+    rs_free(vm);
+}
+
+// 16 — tam sayı sınırları: taşma ve tanımsız kaydırma sessizce geçmiyor
+void t16() {
+    rs_vm* vm = rs_new();
+    const int e = rs_eval(vm,
+                          "fn tasma():\n"
+                          "    return 2 ** 64\n"
+                          "fn kaydir():\n"
+                          "    return 1 << 64\n"
+                          "fn birUssu():\n"
+                          "    return 1 ** 10000000000\n",
+                          "t16.rai");
+    const std::string evalHata = rs_last_error(vm);
+    double out = 0.0;
+    const int a = rs_call(vm, "tasma", nullptr, 0, &out);
+    const int b = rs_call(vm, "kaydir", nullptr, 0, &out);
+    double u = 0.0;
+    const int d = rs_call(vm, "birUssu", nullptr, 0, &u);
+    bildir(e == 0 && a != 0 && b != 0 && d == 0 && yakin(u, 1.0),
+           "tasma ve gecersiz kaydirma hata, 1**buyuk aninda 1", evalHata);
+    rs_free(vm);
+}
+
+// 17 — host'a giden hata metni: tip adı değil betiğin yazdığı mesaj
+void t17() {
+    rs_vm* vm = rs_new();
+    const int e = rs_eval(vm,
+                          "fn dene():\n"
+                          "    throw Error(\"tutar girilmedi\")\n",
+                          "t17.rai");
+    double out = 0.0;
+    const int c = rs_call(vm, "dene", nullptr, 0, &out);
+    const std::string hata = rs_last_error(vm);
+    bildir(e == 0 && c != 0 && hata.find("tutar girilmedi") != std::string::npos,
+           "istisna mesaji host'a ulasiyor", hata);
+    rs_free(vm);
+}
+
 }  // namespace
 
 int main() {
@@ -281,6 +380,11 @@ int main() {
     t10();
     t11();
     t12();
+    t13();
+    t14();
+    t15();
+    t16();
+    t17();
     std::cout << "\ngecen: " << gecen << "  kalan: " << kalan << '\n';
     return kalan == 0 ? 0 : 1;
 }

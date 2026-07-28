@@ -65,6 +65,22 @@ std::string utf8Sub(const std::string& s, std::size_t bas, std::size_t son) {
     return b > a ? s.substr(a, b - a) : std::string{};
 }
 
+// Betik istisnasının okunabilir metni: Error örneğinde 'message' alanı, aksi
+// hâlde değerin kendisi. Host yolunda (callGlobal) bu yoktu ve tanıya tip adı
+// yazılıyordu — 'throw Error("tutar girilmedi")' diyen bir betikte o metin
+// host'a hiç ulaşmıyordu.
+std::string istisnaMetni(const Value& v) {
+    if (const auto* inst = std::get_if<std::shared_ptr<InstanceObj>>(&v)) {
+        if (*inst) {
+            if (Value* m = (*inst)->find("message")) {
+                return toDisplay(*m);
+            }
+            return "yakalanmamış hata (" + ((*inst)->cls ? (*inst)->cls->name : "?") + ")";
+        }
+    }
+    return toDisplay(v);
+}
+
 bool sayiAl(const Value& v, double& out) {
     if (const auto* i = std::get_if<std::int64_t>(&v)) { out = static_cast<double>(*i); return true; }
     if (const auto* d = std::get_if<double>(&v)) { out = *d; return true; }
@@ -150,7 +166,17 @@ void Interpreter::preludeKur() {
 
     tanim("int", 1, 1, [this](std::vector<Value>& a) -> Value {
         if (const auto* i = std::get_if<std::int64_t>(&a[0])) return *i;
-        if (const auto* d = std::get_if<double>(&a[0])) return static_cast<std::int64_t>(*d);
+        if (const auto* d = std::get_if<double>(&a[0])) {
+            // int64'e sığmayan bir double'ı dönüştürmek TANIMSIZ davranış;
+            // int(1e30) sessizce çöp üretiyordu. Host'tan gelen sayılar double
+            // olduğu için (capi.h) bu yol betikte sık kullanılıyor.
+            if (!std::isfinite(*d) || *d >= 9.2233720368547758e18 ||
+                *d <= -9.2233720368547758e18) {
+                hata(Span{}, "int() bu sayıyı dönüştüremez: " + toDisplay(a[0]),
+                     "tam sayı aralığı ±9.22e18");
+            }
+            return static_cast<std::int64_t>(*d);
+        }
         if (const auto* b = std::get_if<bool>(&a[0])) return static_cast<std::int64_t>(*b ? 1 : 0);
         if (const auto* s = std::get_if<Str>(&a[0])) {
             const std::string& t = **s;
@@ -255,15 +281,7 @@ bool Interpreter::run(const Program& p) {
             }
         }
     } catch (const ScriptThrow& t) {
-        std::string mesaj = "yakalanmamış hata";
-        if (const auto* inst = std::get_if<std::shared_ptr<InstanceObj>>(&t.value)) {
-            if (Value* m = (*inst)->find("message")) {
-                mesaj = toDisplay(*m);
-            }
-        } else {
-            mesaj = toDisplay(t.value);
-        }
-        diag_->error(t.span, mesaj);
+        diag_->error(t.span, istisnaMetni(t.value));
         return false;
     } catch (const ReturnSignal&) {
         return true;
@@ -284,7 +302,7 @@ void Interpreter::visit(const FStrLit& e) {
     for (const auto& p : e.parts) {
         if (p.expr) {
             const Value v = eval(p.expr.get());
-            if (!p.format.empty() && !p.format.empty()) {
+            if (!p.format.empty()) {
                 // Basit biçim eki: '.Nf' ondalık basamak. Tam mini-dil Faz 2'de.
                 if (p.format.size() >= 2 && p.format[0] == '.' &&
                     p.format.back() == 'f') {
@@ -410,8 +428,21 @@ Value Interpreter::ikili(Tok op, const Value& a, const Value& b, Span span) {
         case Tok::StarStar:
             if (!sayilar) hata(span, "'**' sayı bekliyor");
             if (ia && ib && *ib >= 0) {
+                // Döngü iki yerden korunuyor: |taban| <= 1 için üs kaç olursa
+                // olsun sonuç sabittir (2**10'000'000'000 saatlerce dönüyordu),
+                // gerisinde taşma en geç 63. adımda yakalanıyor (eskiden sessizce
+                // sarıyordu: 2 ** 64 == 0).
+                if (*ia == 0) return std::int64_t{*ib == 0 ? 1 : 0};
+                if (*ia == 1) return std::int64_t{1};
+                if (*ia == -1) return std::int64_t{*ib % 2 == 0 ? 1 : -1};
                 std::int64_t sonuc = 1;
-                for (std::int64_t k = 0; k < *ib; ++k) sonuc *= *ia;
+                for (std::int64_t k = 0; k < *ib; ++k) {
+                    if (__builtin_mul_overflow(sonuc, *ia, &sonuc)) {
+                        hata(span, "'**' tam sayı taşması",
+                             "kayan noktalı sonuç için tabanı float yaz: " +
+                                 std::to_string(*ia) + ".0 ** " + std::to_string(*ib));
+                    }
+                }
                 return sonuc;
             }
             return std::pow(da, db);
@@ -478,8 +509,21 @@ Value Interpreter::ikili(Tok op, const Value& a, const Value& b, Span span) {
         case Tok::Amp:  if (ia && ib) return *ia & *ib;  hata(span, "'&' tam sayı bekliyor");
         case Tok::Pipe: if (ia && ib) return *ia | *ib;  hata(span, "'|' tam sayı bekliyor");
         case Tok::Caret:if (ia && ib) return *ia ^ *ib;  hata(span, "'^' tam sayı bekliyor");
-        case Tok::LtLt: if (ia && ib) return *ia << *ib; hata(span, "'<<' tam sayı bekliyor");
-        case Tok::GtGt: if (ia && ib) return *ia >> *ib; hata(span, "'>>' tam sayı bekliyor");
+        // Kaydırma miktarı 0-63 dışındaysa C++'ta davranış TANIMSIZ: derleyici
+        // ne isterse onu üretir (x86'da miktar 64'e göre mod alınıyor, yani
+        // 'x << 64 == x' gibi sessiz bir yalan). Betik tarafında bu bir hata olmalı.
+        case Tok::LtLt:
+            if (ia && ib) {
+                if (*ib < 0 || *ib > 63) hata(span, "kaydırma miktarı 0-63 arasında olmalı");
+                return static_cast<std::int64_t>(static_cast<std::uint64_t>(*ia) << *ib);
+            }
+            hata(span, "'<<' tam sayı bekliyor");
+        case Tok::GtGt:
+            if (ia && ib) {
+                if (*ib < 0 || *ib > 63) hata(span, "kaydırma miktarı 0-63 arasında olmalı");
+                return *ia >> *ib;
+            }
+            hata(span, "'>>' tam sayı bekliyor");
 
         default:
             hata(span, "bilinmeyen ikili operatör");
@@ -523,7 +567,9 @@ Value Interpreter::araligiAc(const RangeExpr& r, Span span) {
     son = tam(r.hi.get(), 0);
     if (r.inclusive) ++son;
 
-    if (son - bas > 10'000'000) {
+    // Çıkarma int64'te taşabilirdi (0..9e18 gibi bir aralıkta denetim negatife
+    // dönüp geçiyordu); double'da karşılaştırmak taşmasız ve yeterince kesin.
+    if (static_cast<double>(son) - static_cast<double>(bas) > 10'000'000.0) {
         hata(span, "aralık çok büyük (10 milyondan fazla eleman)");
     }
     std::vector<Value> out;
@@ -589,6 +635,30 @@ void Interpreter::visit(const Call& e) {
 
 Value Interpreter::cagirFn(const std::shared_ptr<FnObj>& fn, std::vector<Value>& args, Span span,
                            const Value* self) {
+    // Özyineleme sınırı. Sayaç BURADA, çünkü betikteki her çağrı buradan geçiyor
+    // (metot, lambda, sınıf init, list.map geri çağrısı dahil). Sınır aşılınca
+    // normal bir Error fırlatılır: betik 'except' ile yakalayabilir, host
+    // rs_last_error ile okuyabilir — yığın taşmasında ikisi de mümkün değil.
+    if (derinlik_ >= maxDerinlik_) {
+        hata(span, "çağrı yığını çok derin (sınır: " + std::to_string(maxDerinlik_) + " kare)",
+             "sonsuz özyineleme olabilir; taban durumunu kontrol et");
+    }
+    // Sayaç ve kapsam, çağrıdan HANGİ yolla çıkılırsa çıkılsın geri alınmalı:
+    // normal dönüş, 'return' sinyali, betik istisnası. Elle yazılmış geri alma
+    // satırları bir yolu atlıyordu (tek ifadeli lambda gövdesi istisna
+    // fırlattığında env_ lambda'nın yerelinde kalıyor, dışarıdaki 'except'
+    // yanlış kapsamda çalışıyordu) — RAII bunu yapısal olarak imkânsız kılar.
+    struct CerceveBekcisi {
+        int& derinlik;
+        std::shared_ptr<Environment>& env;
+        std::shared_ptr<Environment> onceEnv;
+        ~CerceveBekcisi() {
+            --derinlik;
+            env = std::move(onceEnv);
+        }
+    } bekci{derinlik_, env_, env_};
+    ++derinlik_;
+
     auto yerel = std::make_shared<Environment>(fn->closure);
 
     const auto& ps = *fn->params;
@@ -601,10 +671,11 @@ Value Interpreter::cagirFn(const std::shared_ptr<FnObj>& fn, std::vector<Value>&
         if (argIdx < args.size()) {
             yerel->define(ps[i].name, args[argIdx++]);
         } else if (ps[i].defaultValue) {
-            auto onceki = env_;
+            // Varsayılan değer TANIM kapsamında değerlendirilir; env_'i geri
+            // almak bekci'nin işi (buradan istisna da çıkabilir).
             env_ = fn->closure;
             Value d = eval(ps[i].defaultValue.get());
-            env_ = onceki;
+            env_ = bekci.onceEnv;
             yerel->define(ps[i].name, std::move(d));
         } else {
             hata(span, "'" + fn->name + "' için '" + ps[i].name + "' argümanı eksik");
@@ -621,10 +692,8 @@ Value Interpreter::cagirFn(const std::shared_ptr<FnObj>& fn, std::vector<Value>&
     Value sonuc = Nil{};
     try {
         if (fn->bodyExpr != nullptr) {
-            auto onceki = env_;
             env_ = yerel;
             sonuc = eval(fn->bodyExpr);
-            env_ = onceki;
         } else if (const auto* b = dynamic_cast<const Block*>(fn->body)) {
             execBlock(b->stmts, yerel);
         }
@@ -685,6 +754,23 @@ Value Interpreter::cagir(const Value& callee, std::vector<Value>& args, Span spa
 
 // ---------------------------------------------------------------- üye erişimi
 
+// Yerleşik metotların dize argümanı. Eskiden doğrudan '**std::get_if<Str>(&a[0])'
+// yazılıyordu: argüman dize değilse get_if nullptr döner ve dereference süreci
+// ÇÖKERTİR. Betikten tek satırla tetikleniyordu ("abc".split(5)) — gömülü bir
+// dilde bu, host'u (Minecraft sunucusu, tarayıcı sekmesi) düşüren bir hatadır.
+const std::string& Interpreter::dizeArg(std::vector<Value>& a, std::size_t i, const char* metot,
+                                        Span span) {
+    if (i < a.size()) {
+        if (const auto* s = std::get_if<Str>(&a[i])) {
+            if (*s) {
+                return **s;
+            }
+        }
+        hata(span, std::string(metot) + "() metin bekliyor, " + typeName(a[i]) + " geldi");
+    }
+    hata(span, std::string(metot) + "() için argüman eksik");
+}
+
 Value Interpreter::yerlesikMetot(const Value& obj, const std::string& ad, Span span) {
     // --- string ---
     if (const auto* sp = std::get_if<Str>(&obj)) {
@@ -725,8 +811,8 @@ Value Interpreter::yerlesikMetot(const Value& obj, const std::string& ad, Span s
             const auto b = s->find_last_not_of(" \t\n\r");
             return makeStr(s->substr(a, b - a + 1));
         });
-        if (ad == "split") return mk("split", 1, 1, [s](std::vector<Value>& a) -> Value {
-            const std::string ayr = **std::get_if<Str>(&a[0]);
+        if (ad == "split") return mk("split", 1, 1, [s, span, this](std::vector<Value>& a) -> Value {
+            const std::string ayr = dizeArg(a, 0, "split", span);
             std::vector<Value> out;
             if (ayr.empty()) { out.push_back(makeStr(*s)); return makeList(std::move(out)); }
             std::size_t bas = 0, k;
@@ -737,19 +823,19 @@ Value Interpreter::yerlesikMetot(const Value& obj, const std::string& ad, Span s
             out.push_back(makeStr(s->substr(bas)));
             return makeList(std::move(out));
         });
-        if (ad == "contains")   return mk("contains", 1, 1, [s](std::vector<Value>& a) -> Value { return s->find(**std::get_if<Str>(&a[0])) != std::string::npos; });
-        if (ad == "startsWith") return mk("startsWith", 1, 1, [s](std::vector<Value>& a) -> Value { const std::string& p = **std::get_if<Str>(&a[0]); return s->rfind(p, 0) == 0; });
-        if (ad == "endsWith")   return mk("endsWith", 1, 1, [s](std::vector<Value>& a) -> Value { const std::string& p = **std::get_if<Str>(&a[0]); return s->size() >= p.size() && s->compare(s->size() - p.size(), p.size(), p) == 0; });
-        if (ad == "indexOf")    return mk("indexOf", 1, 1, [s](std::vector<Value>& a) -> Value { const auto k = s->find(**std::get_if<Str>(&a[0])); return k == std::string::npos ? std::int64_t{-1} : static_cast<std::int64_t>(utf8Len(s->substr(0, k))); });
-        if (ad == "replace")    return mk("replace", 2, 2, [s](std::vector<Value>& a) -> Value {
-            const std::string x = **std::get_if<Str>(&a[0]), y = **std::get_if<Str>(&a[1]);
+        if (ad == "contains")   return mk("contains", 1, 1, [s, span, this](std::vector<Value>& a) -> Value { return s->find(dizeArg(a, 0, "contains", span)) != std::string::npos; });
+        if (ad == "startsWith") return mk("startsWith", 1, 1, [s, span, this](std::vector<Value>& a) -> Value { const std::string& p = dizeArg(a, 0, "startsWith", span); return s->rfind(p, 0) == 0; });
+        if (ad == "endsWith")   return mk("endsWith", 1, 1, [s, span, this](std::vector<Value>& a) -> Value { const std::string& p = dizeArg(a, 0, "endsWith", span); return s->size() >= p.size() && s->compare(s->size() - p.size(), p.size(), p) == 0; });
+        if (ad == "indexOf")    return mk("indexOf", 1, 1, [s, span, this](std::vector<Value>& a) -> Value { const auto k = s->find(dizeArg(a, 0, "indexOf", span)); return k == std::string::npos ? std::int64_t{-1} : static_cast<std::int64_t>(utf8Len(s->substr(0, k))); });
+        if (ad == "replace")    return mk("replace", 2, 2, [s, span, this](std::vector<Value>& a) -> Value {
+            const std::string x = dizeArg(a, 0, "replace", span), y = dizeArg(a, 1, "replace", span);
             std::string r = *s;
             const auto k = r.find(x);
             if (k != std::string::npos) r.replace(k, x.size(), y);
             return makeStr(std::move(r));
         });
-        if (ad == "replaceAll") return mk("replaceAll", 2, 2, [s](std::vector<Value>& a) -> Value {
-            const std::string x = **std::get_if<Str>(&a[0]), y = **std::get_if<Str>(&a[1]);
+        if (ad == "replaceAll") return mk("replaceAll", 2, 2, [s, span, this](std::vector<Value>& a) -> Value {
+            const std::string x = dizeArg(a, 0, "replaceAll", span), y = dizeArg(a, 1, "replaceAll", span);
             if (x.empty()) return makeStr(*s);
             std::string r;
             std::size_t bas = 0, k;
@@ -769,8 +855,8 @@ Value Interpreter::yerlesikMetot(const Value& obj, const std::string& ad, Span s
             Value v = l->items.back(); l->items.pop_back(); return v;
         });
         if (ad == "copy") return makeNative("copy", 0, 0, [l](std::vector<Value>&) -> Value { return makeList(l->items); });
-        if (ad == "join") return makeNative("join", 1, 1, [l](std::vector<Value>& a) -> Value {
-            const std::string ayr = **std::get_if<Str>(&a[0]);
+        if (ad == "join") return makeNative("join", 1, 1, [l, span, this](std::vector<Value>& a) -> Value {
+            const std::string ayr = dizeArg(a, 0, "join", span);
             std::string r;
             for (std::size_t i = 0; i < l->items.size(); ++i) { if (i) r += ayr; r += toDisplay(l->items[i]); }
             return makeStr(std::move(r));
@@ -827,13 +913,16 @@ Value Interpreter::uyeOku(const Value& obj, const std::string& ad, Span span, bo
         if (Value* f = (*inst)->find(ad)) {
             return *f;
         }
-        if (auto m = (*inst)->cls->findMethod(ad)) {
-            auto b = std::make_shared<BoundObj>();
-            b->self = obj;
-            b->fn = m;
-            return b;
+        const auto& cls = (*inst)->cls;
+        if (cls) {
+            if (auto m = cls->findMethod(ad)) {
+                auto b = std::make_shared<BoundObj>();
+                b->self = obj;
+                b->fn = m;
+                return b;
+            }
         }
-        hata(span, "'" + (*inst)->cls->name + "' nesnesinde '" + ad + "' yok");
+        hata(span, "'" + (cls ? cls->name : "nesne") + "' nesnesinde '" + ad + "' yok");
     }
 
     const Value yerlesik = yerlesikMetot(obj, ad, span);
@@ -869,11 +958,8 @@ void Interpreter::visit(const Member& e) {
 }
 
 Value Interpreter::indeksOku(const Value& obj, const Value& idx, Span span) {
-    // Dilim mi?
-    if (const auto* l = std::get_if<std::shared_ptr<ListObj>>(&idx)) {
-        (void)l;  // dilim RangeExpr olarak gelir, aşağıda ele alınıyor
-    }
-
+    // Dilim buraya düşmez: 'liste[a..b]' RangeExpr olarak visit(IndexExpr)'te
+    // ayrılıyor.
     if (const auto* lp = std::get_if<std::shared_ptr<ListObj>>(&obj)) {
         const auto& v = (*lp)->items;
         if (const auto* i = std::get_if<std::int64_t>(&idx)) {
@@ -1355,7 +1441,7 @@ bool Interpreter::callGlobal(const std::string& ad, std::vector<Value>& args, Va
         out = cagir(*hedef, args, Span{0, 0});
         return true;
     } catch (const ScriptThrow& t) {
-        diag_->error(t.span, "betik istisna fırlattı: " + toDisplay(t.value));
+        diag_->error(t.span, "betik istisna fırlattı: " + istisnaMetni(t.value));
         return false;
     } catch (const ReturnSignal&) {
         // Fonksiyon gövdesi dışında return — cagirFn zaten yakalıyor, buraya

@@ -289,19 +289,24 @@ bir hedef yok; bağlayıcı varsa `view` olmadan da site yazılabilir (banka dem
 |---|---|---|---|
 | 1 | `-sSTACK_SIZE=8MB` | ✅ yapıldı | H1, ölçüldü: derinlik 130 → 1000+ |
 | 2 | `rs_host_fail` + köprüde try/catch | C++ + JS | H2 — web'e geçmeden önce ŞART |
-| 3 | Özyineleme derinliği sayacı + `Error` | C++ | H1'in native ayağı, sessiz ölümü bitirir |
+| 3 | Özyineleme derinliği sayacı + `Error` | ✅ yapıldı | H6 kapandı: sınır 800 (JNI 400), `rs_set_max_depth` |
 | 4 | `rs_call` dize dönüşünde sessiz 0 | C++ | H4 — en azından hata versin |
 | 5 | Dize `+=` yerinde ekleme (refcount==1) | C++ | H3 — 12k'da 7×, isteğe bağlı |
 | 6 | `bindings/js/web.js` + 17 ilkel | ✅ yapıldı | `kaydir` ve `sayfaBagla` yolda eklendi |
 | 7 | `demo/site` — RAIDEN PARÇA mağazası | ✅ yapıldı | 424 düğüm, 0 host hatası, 83 ms kurulum |
-| 8 | Kaçan `Error`'un mesajı kayboluyor (H5) | C++ | aşağıda |
+| 8 | Kaçan `Error`'un mesajı kayboluyor (H5) | ✅ yapıldı | `istisnaMetni` — `run` ve `callGlobal` aynı yoldan |
 | 9 | `view` blokları | C++ (lexer/parser) | Faz 5b, şeker |
 
 ---
 
 ## 5. Demo sırasında çıkan iki ek bulgu
 
-### 🟡 H5 — Betikten kaçan `Error`'un mesajı yok oluyor
+### ✅ H5 — Betikten kaçan `Error`'un mesajı yok oluyor (DÜZELTİLDİ, 28 Tem)
+
+> Çözüm: `interp.cpp`'de `istisnaMetni()` — `Error` örneğinde `message` alanını,
+> aksi hâlde değerin kendisini yazıyor. `run()` bunu zaten yapıyordu, host yolu
+> (`callGlobal`) yapmıyordu; iki yol artık aynı fonksiyondan geçiyor.
+> Koşum: `tests/capi_test.cpp` t17.
 
 `sepeteEkle` hatası host'a şöyle ulaştı:
 
@@ -315,7 +320,16 @@ yerine tip adı basılıyor. `throw Error("tutar girilmedi")` yazan bir betikte 
 metin host'a hiç ulaşmıyor. `interp.cpp`'de istisna dışarı verilirken `message`
 alanı tanıya eklenmeli; tanı altyapısı zaten hazır olduğu için küçük bir iş.
 
-### 🔴 H6 — Özyineleme JVM'i SESSİZCE öldürüyor (Faz 6 engelleyicisi)
+### ✅ H6 — Özyineleme JVM'i SESSİZCE öldürüyor (DÜZELTİLDİ, 28 Tem)
+
+> Çözüm: `cagirFn`'de derinlik sayacı. Varsayılan **800** (native ve wasm'ın
+> ölçülen ~1.000 duvarının altı), JNI köprüsü açılışta **400**'e indiriyor
+> (JVM'in 1 MB'lık varsayılan yığını ~500'de ölüyor). Sınıra çarpınca normal,
+> `catch` ile yakalanabilir bir `Error` doğuyor; host `rs_set_max_depth` ile
+> değiştirebiliyor. Sayaç ve kapsam RAII ile geri alınıyor, yani hata
+> yakalandıktan sonra VM kullanılabilir kalıyor. Koşum: t13/t14.
+>
+> Aşağıdaki ölçüm tablosu, sınırın neden bu sayılar olduğunu gösterdiği için duruyor.
 
 Aynı yığın sorununun üçüncü yüzü, ve en kötüsü. JNI köprüsünde ölçüldü:
 

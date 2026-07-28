@@ -485,15 +485,18 @@ needs. Both the browser and JVM demos in this repo use exactly this pattern.
 
 These are measured, not guessed. Read them before you ship something.
 
-**Recursion depth is bounded by the native stack, and overflow is not graceful.**
-The interpreter walks the tree, so each script frame costs several C++ frames.
-There is no depth counter yet.
+**Recursion is capped by a depth counter, because native stack overflow is not
+graceful.** The interpreter walks the tree, so each script frame costs several
+C++ frames — and past the limit the process dies silently (no exception, no
+crash log). The interpreter therefore stops at **800 nested calls** and raises an
+ordinary, catchable `Error`; hosts adjust it with `rs_set_max_depth`. The JVM
+bridge lowers it to 400 on open, because a default JVM thread has a 1 MB stack.
 
-| Host | Safe depth | Past it |
-|---|---|---|
-| Native | ~1000 | silent process death, exit code 127 |
-| WebAssembly | ~130 by default | memory corruption — **build with `-sSTACK_SIZE=8MB`** → 1000+, and a clean catchable error |
-| JVM | ~500 by default | silent JVM death — **run with `-Xss16m`** → ~5000 |
+| Host | Stack budget | Measured wall | Default cap |
+|---|---|---|---|
+| Native | 8 MB | ~1000 frames | 800 |
+| WebAssembly | **build with `-sSTACK_SIZE=8MB`** (64 KB default dies at ~130) | ~1000 frames | 800 |
+| JVM | 1 MB default, ~5000 frames with `-Xss16m` | ~500 frames | 400 (set by the bridge) |
 
 **A host exception that escapes into the interpreter leaks the stack
 permanently.** Measured in the browser: after 5,000 escaping exceptions the safe

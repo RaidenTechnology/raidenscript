@@ -855,3 +855,52 @@ doğrudan faydası.
 
 Faz 5/6'nın açtığı borçlar: özyineleme derinliği sayacı (üç host'ta da aynı sessiz ölüm),
 `rs_host_fail`, `rs_call`'ın dize dönüşünde sessiz sıfırı, dize `+=` için yerinde ekleme.
+
+---
+
+## Tur: hata avı (28 Temmuz 2026)
+
+Faz 6 bittikten sonra yeni özellik eklemeden önce bir denetim turu: lexer'dan C
+API'ye kadar okuma, bulunan kusurları düzeltme. Yedi hata çıktı, hepsi düzeltildi
+ve her biri için koşum yazıldı (`tests/capi_test.cpp` t13-t17, 20/20 geçiyor;
+16 örnek programın çalışabilir 11'i hâlâ geçiyor, sıfır derleyici uyarısı).
+
+**1. Özyineleme sayacı yoktu (H6, en kritik).** Betik özyinelemesi host'un yerel
+yığınında koşuyordu; taşma yakalanabilir bir hata değil, sürecin sessiz ölümüydü
+(JVM'de tüm Minecraft sunucusu, günlükte tek satır iz yok). `cagirFn`'e derinlik
+sayacı kondu: varsayılan 800, JNI köprüsü açılışta 400'e çekiyor, host
+`rs_set_max_depth` ile ayarlıyor. Sınıra çarpınca normal `Error` doğuyor —
+`catch` ile yakalanabiliyor ve VM sonrasında kullanılabilir kalıyor.
+
+**2. Yerleşik metotlar yanlış tipte argümanla ÇÖKÜYORDU.** `"a,b".split(5)`,
+`.contains(3)`, `liste.join(1)` ve altı kardeşi `std::get_if<Str>` sonucunu
+denetlemeden dereference ediyordu: nullptr → çökme. Gömülü bir dilde bu, betikten
+tek satırla host'u düşürmek demek. `dizeArg()` yardımcısı tipi denetleyip normal
+bir dil hatası veriyor.
+
+**3. Bit operatörleri gramerde yoktu.** Lexer `& | ^ << >>` token'larını en
+baştan üretiyordu, yorumlayıcıda hesaplamaları vardı — ama parser'da hiçbir
+kademe onları okumuyordu, yani iki katmandaki kod ulaşılamazdı ve `bayrak & 4`
+yazan betik "ifade bekleniyordu" alıyordu. Dört kademe eklendi (öncelik Python/C
+ile aynı: `|` < `^` < `&` < kaydırma < `+ -`); SPEC'in öncelik tablosu ve EBNF'i
+güncellendi. Dile eklenen anahtar kelime yok, 29/30 duruyor.
+
+**4. Kaçan `Error`'un mesajı host'a ulaşmıyordu (H5).** `run()` mesajı çıkarıyor,
+`callGlobal` çıkarmıyordu; `throw Error("tutar girilmedi")` host'a `<Error>`
+olarak gidiyordu. İki yol tek `istisnaMetni()` fonksiyonundan geçiyor.
+
+**5. Tek ifadeli lambda gövdesi istisna fırlatınca kapsam bozuluyordu.** `env_`
+lambda'nın yerelinde kalıyor, dışarıdaki `catch` bloğu yanlış kapsamda
+çalışıyordu. Elle yazılmış geri alma satırları bir çıkış yolunu atlıyordu —
+RAII çerçeve bekçisi bunu yapısal olarak imkânsız kıldı (varsayılan argüman
+değerlendirmesindeki aynı sızıntı da kapandı).
+
+**6. Tam sayı köşeleri tanımsız davranıyordu.** `2 ** 64` sessizce sarıyordu,
+`1 ** 10000000000` saatlerce dönüyordu, `1 << 64` C'de tanımsız (x86'da
+"x << 64 == x" yalanı), `int(1e30)` çöp üretiyordu. Hepsi artık açık hata;
+`|taban| <= 1` durumu döngüye hiç girmiyor.
+
+**7. Küçük olanlar.** `..` aralığında uzunluk denetimi int64'te taşabiliyordu
+(double'da yapılıyor); f-string biçim ekinde aynı koşul iki kez yazılmıştı;
+`indeksOku`'da ölü bir dal vardı; `cls` boş bir örnekte üye okuma null
+dereference yapabiliyordu.

@@ -160,6 +160,16 @@
     return this.M.UTF8ToString(this.M._rs_last_error(this.ptr));
   };
 
+  // Özyineleme sınırı (varsayılan 800). wasm yığını -sSTACK_SIZE=8MB ile
+  // ~1000 kare taşıyor; sınır o duvarın altında kalsın diye var. Eski .wasm
+  // dosyalarında bu dışa aktarım yok, o yüzden sessizce atlanıyor.
+  RaidenVM.prototype.setMaxDepth = function (n) {
+    this._kontrol();
+    if (typeof this.M._rs_set_max_depth === 'function') {
+      this.M._rs_set_max_depth(this.ptr, n | 0);
+    }
+  };
+
   RaidenVM.prototype._kontrol = function () {
     if (this._kapali) {
       throw new Error('bu VM kapatıldı');

@@ -723,7 +723,7 @@ ExprPtr Parser::comparison() {
 
 // --- kademe 5: aralık ---
 ExprPtr Parser::rangeExpr() {
-    auto sol = sum();
+    auto sol = bitOr();
     if (check(Tok::DotDot) || check(Tok::DotDotEq)) {
         const bool kapsayan = peek().kind == Tok::DotDotEq;
         advance();
@@ -731,7 +731,7 @@ ExprPtr Parser::rangeExpr() {
         r->inclusive = kapsayan;
         r->lo = std::move(sol);
         if (ifadeBaslayabilir(peek().kind)) {   // '2..' açık uçlu olabilir
-            r->hi = sum();
+            r->hi = bitOr();
             if (r->hi) { r->span = Span::merge(r->span, r->hi->span); }
         }
         return r;
@@ -739,7 +739,67 @@ ExprPtr Parser::rangeExpr() {
     return sol;
 }
 
-// --- kademe 6: + - ---
+// --- kademe 6-9: bit operatörleri ---
+//
+// Lexer bu token'ları en baştan üretiyordu ve yorumlayıcıda karşılıkları vardı,
+// ama gramerde hiçbir kademe onları okumuyordu: 'bayrak & 4' yazan betik
+// "ifade bekleniyordu, '&' bulundu" alıyordu ve iki katmandaki kod ulaşılamaz
+// duruyordu. Öncelik sırası Python/C ile aynı: | < ^ < & < kaydırma < + -.
+// Böylece 'bayraklar & MASKE == 0' gibi bir ifadede karşılaştırma en dışta kalır.
+ExprPtr Parser::bitOr() {
+    auto sol = bitXor();
+    while (matchAny({Tok::Pipe})) {
+        auto n = make<Binary>(sol ? sol->span : previous().span);
+        n->op = Tok::Pipe;
+        n->left = std::move(sol);
+        n->right = bitXor();
+        if (n->right) { n->span = Span::merge(n->span, n->right->span); }
+        sol = std::move(n);
+    }
+    return sol;
+}
+
+ExprPtr Parser::bitXor() {
+    auto sol = bitAnd();
+    while (matchAny({Tok::Caret})) {
+        auto n = make<Binary>(sol ? sol->span : previous().span);
+        n->op = Tok::Caret;
+        n->left = std::move(sol);
+        n->right = bitAnd();
+        if (n->right) { n->span = Span::merge(n->span, n->right->span); }
+        sol = std::move(n);
+    }
+    return sol;
+}
+
+ExprPtr Parser::bitAnd() {
+    auto sol = shift();
+    while (matchAny({Tok::Amp})) {
+        auto n = make<Binary>(sol ? sol->span : previous().span);
+        n->op = Tok::Amp;
+        n->left = std::move(sol);
+        n->right = shift();
+        if (n->right) { n->span = Span::merge(n->span, n->right->span); }
+        sol = std::move(n);
+    }
+    return sol;
+}
+
+ExprPtr Parser::shift() {
+    auto sol = sum();
+    while (matchAny({Tok::LtLt, Tok::GtGt})) {
+        const Tok op = previous().kind;
+        auto n = make<Binary>(sol ? sol->span : previous().span);
+        n->op = op;
+        n->left = std::move(sol);
+        n->right = sum();
+        if (n->right) { n->span = Span::merge(n->span, n->right->span); }
+        sol = std::move(n);
+    }
+    return sol;
+}
+
+// --- kademe 10: + - ---
 ExprPtr Parser::sum() {
     auto sol = product();
     while (matchAny({Tok::Plus, Tok::Minus})) {
@@ -754,7 +814,7 @@ ExprPtr Parser::sum() {
     return sol;
 }
 
-// --- kademe 7: * / // % ---
+// --- kademe 11: * / // % ---
 ExprPtr Parser::product() {
     auto sol = unary();
     while (matchAny({Tok::Star, Tok::Slash, Tok::SlashSlash, Tok::Percent})) {
